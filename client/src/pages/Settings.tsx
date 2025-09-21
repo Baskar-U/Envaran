@@ -158,7 +158,7 @@ export default function Settings() {
         confirmPassword: "",
       }));
     } catch (error: any) {
-      console.error('Error updating account settings:', error);
+      // console.error('Error updating account settings:', error);
       toast({
         title: "Error",
         description: error.message || "Failed to update account settings",
@@ -192,7 +192,7 @@ export default function Settings() {
         description: "Notification settings updated successfully",
       });
     } catch (error: any) {
-      console.error('Error updating notification settings:', error);
+      // console.error('Error updating notification settings:', error);
       toast({
         title: "Error",
         description: error.message || "Failed to update notification settings",
@@ -224,7 +224,7 @@ export default function Settings() {
         description: "Privacy settings updated successfully",
       });
     } catch (error: any) {
-      console.error('Error updating privacy settings:', error);
+      // console.error('Error updating privacy settings:', error);
       toast({
         title: "Error",
         description: error.message || "Failed to update privacy settings",
@@ -256,7 +256,7 @@ export default function Settings() {
         description: "Language settings updated successfully",
       });
     } catch (error: any) {
-      console.error('Error updating language settings:', error);
+      // console.error('Error updating language settings:', error);
       toast({
         title: "Error",
         description: error.message || "Failed to update language settings",
@@ -300,7 +300,7 @@ export default function Settings() {
 
       // Redirect to home page
       setTimeout(() => {
-        window.location.href = "/home";
+        window.location.href = "/";
       }, 2000);
 
     } catch (error: any) {

@@ -28,11 +28,11 @@ export default function SimpleLoginForm({ onSuccess, onSwitchToRegister }: Simpl
     setError('');
 
     try {
-      console.log('SimpleLoginForm: Starting login...', formData);
+      // console.log('SimpleLoginForm: Starting login...', formData);
       
       const result = await loginWithEmail(formData.email, formData.password);
       
-      console.log('SimpleLoginForm: Login successful:', result);
+      // console.log('SimpleLoginForm: Login successful:', result);
       
       // Show success toast
       toast({
@@ -43,11 +43,11 @@ export default function SimpleLoginForm({ onSuccess, onSwitchToRegister }: Simpl
       
       // Redirect to home page after 2 seconds
       setTimeout(() => {
-        window.location.href = '/home';
+        window.location.href = '/';
       }, 2000);
       
     } catch (error: any) {
-      console.error('SimpleLoginForm: Login failed:', error);
+      // console.error('SimpleLoginForm: Login failed:', error);
       setError(error.message);
     } finally {
       setLoading(false);

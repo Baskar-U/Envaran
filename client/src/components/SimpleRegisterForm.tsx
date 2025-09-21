@@ -51,16 +51,16 @@ export default function SimpleRegisterForm({ onSuccess, onSwitchToLogin }: Simpl
     }
 
     try {
-      console.log('SimpleRegisterForm: Starting registration...', formData);
+      // console.log('SimpleRegisterForm: Starting registration...', formData);
       
       // Test Firebase connection first
-      console.log('Testing Firebase connection...');
+      // console.log('Testing Firebase connection...');
       try {
         const { testFirebaseConnection } = await import('@/lib/firebaseAuth');
         const connectionTest = await testFirebaseConnection();
-        console.log('Firebase connection test result:', connectionTest);
+        // console.log('Firebase connection test result:', connectionTest);
       } catch (error) {
-        console.error('Firebase connection test failed:', error);
+        // console.error('Firebase connection test failed:', error);
       }
       
       const userData = {
@@ -75,11 +75,11 @@ export default function SimpleRegisterForm({ onSuccess, onSwitchToLogin }: Simpl
         dateOfBirth: formData.dateOfBirth
       };
 
-      console.log('SimpleRegisterForm: Calling registerWithEmail with userData:', userData);
+      // console.log('SimpleRegisterForm: Calling registerWithEmail with userData:', userData);
       
       const result = await registerWithEmail(formData.email, formData.password, userData);
       
-      console.log('SimpleRegisterForm: Registration successful:', result);
+      // console.log('SimpleRegisterForm: Registration successful:', result);
       
       // Show success toast
       toast({
@@ -94,7 +94,7 @@ export default function SimpleRegisterForm({ onSuccess, onSwitchToLogin }: Simpl
       }, 2000);
       
     } catch (error: any) {
-      console.error('SimpleRegisterForm: Registration failed:', error);
+      // console.error('SimpleRegisterForm: Registration failed:', error);
       setError(error.message);
     } finally {
       setLoading(false);

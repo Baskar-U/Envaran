@@ -1,0 +1,41 @@
+rules_version = '2';
+
+// Craft rules based on data in your Firestore database
+// allow write: if firestore.get(
+//    /databases/(default)/documents/users/$(request.auth.uid)).data.isAdmin;
+service firebase.storage {
+  match /b/{bucket}/o {
+    // Allow authenticated users to upload payment screenshots
+    match /payment-screenshots/{userId}/{allPaths=**} {
+      allow read, write: if request.auth != null && request.auth.uid == userId;
+    }
+    
+    // Allow admins to read all payment screenshots
+    match /payment-screenshots/{allPaths=**} {
+      allow read: if request.auth != null && 
+        exists(/databases/(default)/documents/users/$(request.auth.uid)) &&
+        get(/databases/(default)/documents/users/$(request.auth.uid)).data.isAdmin == true;
+    }
+    
+    // Allow authenticated users to upload profile images
+    match /profile-images/{userId}/{allPaths=**} {
+      allow read, write: if request.auth != null && request.auth.uid == userId;
+    }
+    
+    // Allow public read access to profile images
+    match /profile-images/{allPaths=**} {
+      allow read: if true;
+    }
+    
+    // Allow authenticated users to upload raasi images
+    match /raasi-images/{userId}/{allPaths=**} {
+      allow read, write: if request.auth != null && request.auth.uid == userId;
+    }
+    
+    // Allow public read access to raasi images
+    match /raasi-images/{allPaths=**} {
+      allow read: if true;
+    }
+  }
+}
+

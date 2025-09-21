@@ -20,39 +20,39 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
   useEffect(() => {
     const unsubscribe = onAuthStateChange(async (firebaseUser) => {
-      console.log('=== AUTH STATE CHANGE ===');
-      console.log('Firebase user:', firebaseUser);
-      console.log('Firebase user UID:', firebaseUser?.uid);
-      console.log('Firebase user email:', firebaseUser?.email);
-      console.log('Firebase user displayName:', firebaseUser?.displayName);
+      // console.log('=== AUTH STATE CHANGE ===');
+      // console.log('Firebase user:', firebaseUser);
+      // console.log('Firebase user UID:', firebaseUser?.uid);
+      // console.log('Firebase user email:', firebaseUser?.email);
+      // console.log('Firebase user displayName:', firebaseUser?.displayName);
       
       setFirebaseUser(firebaseUser);
       
       if (firebaseUser) {
         try {
-          console.log('Fetching user data for:', firebaseUser.uid);
+          // console.log('Fetching user data for:', firebaseUser.uid);
           let userData = await getUserById(firebaseUser.uid);
           
           // If user document doesn't exist, create missing documents
           if (!userData) {
-            console.log('User document not found, creating missing documents...');
+            // console.log('User document not found, creating missing documents...');
             await createMissingDocuments(firebaseUser);
             userData = await getUserById(firebaseUser.uid);
           }
           
-          console.log('User data fetched:', userData);
+          // console.log('User data fetched:', userData);
           setUser(userData);
         } catch (error) {
-          console.error('Error fetching user data:', error);
+          // console.error('Error fetching user data:', error);
           setUser(null);
         }
       } else {
-        console.log('No firebase user, setting user to null');
+        // console.log('No firebase user, setting user to null');
         setUser(null);
       }
       
       setLoading(false);
-      console.log('=== END AUTH STATE CHANGE ===');
+      // console.log('=== END AUTH STATE CHANGE ===');
     });
 
     return () => unsubscribe();
@@ -88,7 +88,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 export function useAuth() {
   const context = useContext(AuthContext);
   if (context === undefined) {
-    console.error('useAuth must be used within an AuthProvider');
+    // console.error('useAuth must be used within an AuthProvider');
     // Return a default context to prevent crashes during development
     return {
       user: null,

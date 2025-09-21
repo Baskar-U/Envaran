@@ -21,7 +21,20 @@ if (typeof window !== 'undefined') {
   (window as any).setDoc = setDoc;
   (window as any).createUserWithEmailAndPassword = createUserWithEmailAndPassword;
   (window as any).signInWithEmailAndPassword = signInWithEmailAndPassword;
-  console.log('🔧 Firebase functions exposed to window for console access');
-  console.log('💡 Available: window.db, window.auth, window.collection, window.addDoc, window.getDocs, window.query, window.where, window.orderBy, window.doc, window.updateDoc, window.createUserWithEmailAndPassword, window.signInWithEmailAndPassword');
+  
+  // Add a helper function to check Firebase availability
+  (window as any).checkFirebaseReady = () => {
+    // console.log('🔧 Firebase Status Check:');
+    // console.log('✅ Database:', !!window.db);
+    // console.log('✅ Auth:', !!window.auth);
+    // console.log('✅ Collection:', !!window.collection);
+    // console.log('✅ UpdateDoc:', !!window.updateDoc);
+    // console.log('✅ GetDocs:', !!window.getDocs);
+    return !!(window.db && window.auth && window.collection && window.updateDoc && window.getDocs);
+  };
+  
+  // console.log('🔧 Firebase functions exposed to window for console access');
+  // console.log('💡 Available: window.db, window.auth, window.collection, window.addDoc, window.getDocs, window.query, window.where, window.orderBy, window.doc, window.updateDoc, window.createUserWithEmailAndPassword, window.signInWithEmailAndPassword');
+  // console.log('💡 Helper: window.checkFirebaseReady() - Check if Firebase is ready');
 }
 createRoot(document.getElementById("root")!).render(<App />);

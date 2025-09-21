@@ -14,7 +14,7 @@ export default function ImageTest() {
               alt="QR Code Test" 
               className="w-48 h-48 border-2 border-gray-300 rounded-lg object-contain"
               onError={(e) => {
-                console.error('Image failed to load:', e);
+                // console.error('Image failed to load:', e);
                 e.currentTarget.style.display = 'none';
                 e.currentTarget.nextElementSibling.style.display = 'block';
               }}
@@ -32,7 +32,7 @@ export default function ImageTest() {
                 alt="QR Code Test" 
                 className="w-full h-full object-contain"
                 onError={(e) => {
-                  console.error('Image failed to load:', e);
+                  // console.error('Image failed to load:', e);
                   e.currentTarget.style.display = 'none';
                   const parent = e.currentTarget.parentElement;
                   if (parent) {
@@ -45,7 +45,7 @@ export default function ImageTest() {
                   }
                 }}
                 onLoad={() => {
-                  console.log('✅ Image loaded successfully');
+                  // console.log('✅ Image loaded successfully');
                 }}
               />
             </div>

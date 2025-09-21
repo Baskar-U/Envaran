@@ -3,6 +3,7 @@ import { useLocation, useRoute } from "wouter";
 import { useAuth } from "@/hooks/useAuth";
 import { useToast } from "@/hooks/use-toast";
 import Navigation from "@/components/Navigation";
+import RaasiImageDisplay from "@/components/RaasiImageDisplay";
 import Footer from "@/components/Footer";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -36,14 +37,35 @@ import { getRegistrationByUserId, createLikeWithNotification, checkMutualLike, c
 
 // Helper function to calculate age from date of birth
 const calculateAge = (dateOfBirth: string) => {
-  const today = new Date();
-  const birthDate = new Date(dateOfBirth);
-  let age = today.getFullYear() - birthDate.getFullYear();
-  const monthDiff = today.getMonth() - birthDate.getMonth();
-  if (monthDiff < 0 || (monthDiff === 0 && today.getDate() < birthDate.getDate())) {
-    age--;
+  try {
+    const today = new Date();
+    let birthDate: Date;
+    
+    // Handle DD-MM-YYYY format (common in Indian context)
+    if (dateOfBirth.includes('-') && dateOfBirth.split('-')[0].length === 2) {
+      const [day, month, year] = dateOfBirth.split('-');
+      birthDate = new Date(parseInt(year), parseInt(month) - 1, parseInt(day));
+    } else {
+      // Try parsing as is (for other formats)
+      birthDate = new Date(dateOfBirth);
+    }
+    
+    // Check if the date is valid
+    if (isNaN(birthDate.getTime())) {
+      // console.warn('Invalid date format:', dateOfBirth);
+      return 0;
+    }
+    
+    let age = today.getFullYear() - birthDate.getFullYear();
+    const monthDiff = today.getMonth() - birthDate.getMonth();
+    if (monthDiff < 0 || (monthDiff === 0 && today.getDate() < birthDate.getDate())) {
+      age--;
+    }
+    return age;
+  } catch (error) {
+    // console.error('Error calculating age for date:', dateOfBirth, error);
+    return 0;
   }
-  return age;
 };
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 
@@ -78,6 +100,7 @@ interface RegistrationData {
   userId: string;
   status: string;
   submittedAt: Date;
+  envaranId?: string;
   
   // Personal Details
   name: string;
@@ -159,7 +182,12 @@ interface RegistrationData {
   
   // Additional Details
   otherDetails: string;
+  description: string;
   profileImageUrl?: string;
+  
+  // Images
+  raasiImage?: string; // Base64 encoded Raasi chart image
+  profileImage?: string; // Base64 encoded profile image
 }
 
 interface UserData {
@@ -195,7 +223,7 @@ export default function ViewProfile() {
           const data = await getRegistrationByUserId(firebaseUser.uid);
           setCurrentUserRegistration(data);
         } catch (error) {
-          console.error('Error fetching current user registration:', error);
+          // console.error('Error fetching current user registration:', error);
         }
       }
     };
@@ -309,7 +337,7 @@ export default function ViewProfile() {
         setLocation('/profiles');
       }
     } catch (error) {
-      console.error('Error fetching profile:', error);
+      // console.error('Error fetching profile:', error);
       toast({
         title: "Error",
         description: "Failed to load profile. Please try again.",
@@ -416,7 +444,7 @@ export default function ViewProfile() {
             </div>
 
             {/* Content */}
-            <div className="relative p-8">
+            <div className="relative p-4 sm:p-6 lg:p-8">
               {/* Header with Ganesha */}
               <div className="text-center mb-8">
                 <div className="inline-block mb-4">
@@ -424,21 +452,29 @@ export default function ViewProfile() {
                     <span className="text-2xl">🕉️</span>
                   </div>
                 </div>
-                <h1 className="text-2xl font-bold text-gray-800 mb-2">|| SHREE GANESHAYA NAMAH ||</h1>
-                <h2 className="text-3xl font-bold text-gray-800">BIODATA</h2>
+                <h1 className="text-lg sm:text-xl lg:text-2xl font-bold text-gray-800 mb-2">|| SHREE GANESHAYA NAMAH ||</h1>
+                <h2 className="text-2xl sm:text-3xl font-bold text-gray-800">BIODATA</h2>
               </div>
 
               {/* Main Content Grid */}
-              <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
+              <div className="grid grid-cols-1 xl:grid-cols-3 gap-6 lg:gap-8">
                 {/* Left Column - Personal Details */}
-                <div className="lg:col-span-2 space-y-6">
+                <div className="xl:col-span-2 space-y-6">
                   {/* Personal Details Section */}
-                  <div className="bg-gray-50 p-6 rounded-lg">
-                    <h3 className="text-xl font-bold text-gray-800 mb-4 text-center">PERSONAL DETAILS</h3>
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  <div className="bg-gray-50 p-4 sm:p-6 rounded-lg">
+                    <h3 className="text-lg sm:text-xl font-bold text-gray-800 mb-4 text-center">PERSONAL DETAILS</h3>
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                       <div>
                         <label className="text-sm font-semibold text-gray-600">Name:</label>
                         <p className="text-gray-900 font-medium">{registration?.name || `${user.firstName} ${user.lastName}` || 'Not specified'}</p>
+                      </div>
+                      <div>
+                        <label className="text-sm font-semibold text-gray-600">Envaran ID:</label>
+                        <p className="text-gray-900 font-mono font-bold text-blue-600">{registration?.envaranId || 'Not assigned'}</p>
+                      </div>
+                      <div className="md:col-span-2">
+                        <label className="text-sm font-semibold text-gray-600">Description:</label>
+                        <p className="text-gray-900 mt-1 whitespace-pre-wrap">{registration?.description || 'No description provided.'}</p>
                       </div>
                       <div>
                         <label className="text-sm font-semibold text-gray-600">Date of Birth:</label>
@@ -455,10 +491,6 @@ export default function ViewProfile() {
                       <div>
                         <label className="text-sm font-semibold text-gray-600">Place of Birth:</label>
                         <p className="text-gray-900">{registration?.placeOfBirth || 'Not specified'}</p>
-                      </div>
-                      <div>
-                        <label className="text-sm font-semibold text-gray-600">Rashi:</label>
-                        <p className="text-gray-900">{registration?.raasi || 'Not specified'}</p>
                       </div>
                       <div>
                         <label className="text-sm font-semibold text-gray-600">Manglik:</label>
@@ -500,16 +532,12 @@ export default function ViewProfile() {
                         <label className="text-sm font-semibold text-gray-600">Income:</label>
                         <p className="text-gray-900">{registration?.incomePerMonth ? `${registration.incomePerMonth} LPA` : 'Not specified'}</p>
                       </div>
-                      <div>
-                        <label className="text-sm font-semibold text-gray-600">Address:</label>
-                        <p className="text-gray-900">{registration?.presentAddress || 'Not specified'}</p>
-                      </div>
                     </div>
                   </div>
 
                   {/* Family Details Section */}
                   {registration && (
-                    <div className="bg-gray-50 p-6 rounded-lg">
+                    <div className="bg-gray-50 p-4 sm:p-6 rounded-lg">
                       <h3 className="text-xl font-bold text-gray-800 mb-4 text-center">FAMILY DETAILS</h3>
                       <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                         <div>
@@ -542,9 +570,9 @@ export default function ViewProfile() {
 
                   {/* Contact Details Section */}
                   {registration && (
-                    <div className="bg-gray-50 p-6 rounded-lg">
-                      <h3 className="text-xl font-bold text-gray-800 mb-4 text-center">CONTACT DETAILS</h3>
-                      <div className="space-y-4">
+                    <div className="bg-gray-50 p-4 sm:p-6 rounded-lg">
+                      <h3 className="text-lg sm:text-xl font-bold text-gray-800 mb-4 text-center">CONTACT DETAILS</h3>
+                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                         <div>
                           <label className="text-sm font-semibold text-gray-600">Email:</label>
                           {currentUserRegistration?.plan === 'premium' ? (
@@ -557,15 +585,54 @@ export default function ViewProfile() {
                         </div>
                         <div>
                           <label className="text-sm font-semibold text-gray-600">Address:</label>
-                          <p className="text-gray-900">{registration.presentAddress || 'Not specified'}</p>
+                          {currentUserRegistration?.plan === 'premium' ? (
+                            <p className="text-gray-900">{registration.presentAddress || 'Not specified'}</p>
+                          ) : (
+                            <p className="text-gray-900 blur-sm select-none" title="Address is blurred for privacy">
+                              {registration.presentAddress || 'Not specified'}
+                            </p>
+                          )}
                         </div>
                         <div>
                           <label className="text-sm font-semibold text-gray-600">Contact No.:</label>
                           {currentUserRegistration?.plan === 'premium' ? (
                             <p className="text-gray-900 font-mono">{registration.contactNumber || 'Not specified'}</p>
                           ) : (
-                            <p className="text-gray-900 font-mono">{blurContactInfo(registration.contactNumber)}</p>
+                            <p className="text-gray-900 font-mono blur-sm select-none" title="Phone number is blurred for privacy">
+                              {registration.contactNumber || 'Not specified'}
+                            </p>
                           )}
+                        </div>
+                        
+                        {/* Raasi Image */}
+                        <div>
+                          <label className="text-sm font-semibold text-gray-600">Raasi Image:</label>
+                          <div className="mt-2">
+                            {currentUserRegistration?.plan === 'premium' ? (
+                              <div className="text-center">
+                                <RaasiImageDisplay 
+                                  raasiImage={registration?.raasiImage} 
+                                  isOwner={false} 
+                                  isPremium={true} 
+                                />
+                                <p className="text-xs text-gray-500 mt-2">Astrological chart and details</p>
+                              </div>
+                            ) : (
+                              <div className="relative text-center">
+                                <div className="blur-sm select-none">
+                                  <RaasiImageDisplay 
+                                    raasiImage={registration?.raasiImage} 
+                                    isOwner={false} 
+                                    isPremium={false} 
+                                  />
+                                </div>
+                                <div className="absolute inset-0 flex flex-col items-center justify-center bg-white/80 rounded-lg">
+                                  <Star className="h-8 w-8 text-royal-blue mb-1" />
+                                  <span className="text-xs font-semibold text-gray-700">Premium Required</span>
+                                </div>
+                              </div>
+                            )}
+                          </div>
                         </div>
                         
                         {/* Premium upgrade prompt for free users */}
@@ -574,7 +641,7 @@ export default function ViewProfile() {
                             <div className="flex items-center justify-between">
                               <div>
                                 <h4 className="font-semibold text-orange-800">Upgrade to Premium</h4>
-                                <p className="text-sm text-orange-700">View contact details and unlock all features</p>
+                                <p className="text-sm text-orange-700">View contact details, address, and Raasi image</p>
                               </div>
                               <Button
                                 size="sm"
@@ -592,26 +659,51 @@ export default function ViewProfile() {
 
                   {/* Action Buttons */}
                   <div className="flex flex-col sm:flex-row gap-4 pt-4">
-                    <Button
-                      onClick={handleLike}
-                      disabled={liked || likeMutation.isPending}
-                      className={`flex-1 transition-colors ${
-                        liked 
-                          ? 'bg-green-500 hover:bg-green-600' 
-                          : 'bg-royal-blue hover:bg-blue-700'
-                      } text-white`}
-                    >
-                      <Heart className={`mr-2 h-4 w-4 ${liked ? 'fill-current' : ''}`} />
-                      {liked ? 'Liked' : likeMutation.isPending ? 'Liking...' : 'Like Profile'}
-                    </Button>
+                    {firebaseUser ? (
+                      // Logged-in user: Show Like button
+                      <Button
+                        onClick={handleLike}
+                        disabled={liked || likeMutation.isPending}
+                        className={`flex-1 transition-colors ${
+                          liked 
+                            ? 'bg-green-500 hover:bg-green-600' 
+                            : 'bg-royal-blue hover:bg-blue-700'
+                        } text-white`}
+                      >
+                        <Heart className={`mr-2 h-4 w-4 ${liked ? 'fill-current' : ''}`} />
+                        {liked ? 'Liked' : likeMutation.isPending ? 'Liking...' : 'Like Profile'}
+                      </Button>
+                    ) : (
+                      // Non-logged-in user: Show login prompt
+                      <Link href="/login">
+                        <Button
+                          className="flex-1 bg-royal-blue hover:bg-blue-700 text-white"
+                        >
+                          <Heart className="mr-2 h-4 w-4" />
+                          Login to Like Profile
+                        </Button>
+                      </Link>
+                    )}
                     
-                    <Button
-                      variant="outline"
-                      className="flex-1 border-royal-blue text-royal-blue hover:bg-royal-blue hover:text-white"
-                    >
-                      <MessageSquare className="mr-2 h-4 w-4" />
-                      Send Message
-                    </Button>
+                    {firebaseUser ? (
+                      <Button
+                        variant="outline"
+                        className="flex-1 border-royal-blue text-royal-blue hover:bg-royal-blue hover:text-white"
+                      >
+                        <MessageSquare className="mr-2 h-4 w-4" />
+                        Send Message
+                      </Button>
+                    ) : (
+                      <Link href="/login">
+                        <Button
+                          variant="outline"
+                          className="flex-1 border-royal-blue text-royal-blue hover:bg-royal-blue hover:text-white"
+                        >
+                          <MessageSquare className="mr-2 h-4 w-4" />
+                          Login to Send Message
+                        </Button>
+                      </Link>
+                    )}
                   </div>
                 </div>
 
@@ -623,7 +715,7 @@ export default function ViewProfile() {
                         <img
                           src={user.profileImageUrl || `https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?ixlib=rb-4.0.3&auto=format&fit=crop&w=400&h=500`}
                           alt={`${user.firstName} ${user.lastName}`}
-                          className="w-full h-80 object-cover rounded-lg border-4 border-yellow-400"
+                          className="w-full h-auto max-h-96 object-contain rounded-lg border-4 border-yellow-400"
                         />
                         <div className="absolute top-4 right-4">
                           {profile.verified ? (
@@ -665,6 +757,7 @@ export default function ViewProfile() {
           </div>
         </div>
       </section>
+
 
       <Footer />
     </div>

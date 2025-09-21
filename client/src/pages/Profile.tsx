@@ -1,6 +1,6 @@
 import { useState, useEffect, useRef } from "react";
 import { useAuth } from "@/hooks/useAuth";
-import { getProfile, updateProfile, createProfile, getRegistrationByUserId } from "@/lib/firebaseAuth";
+import { getRegistrationByUserId } from "@/lib/firebaseAuth";
 import { db } from "@/lib/firebase";
 import { doc, updateDoc, getDoc } from "firebase/firestore";
 import Navigation from "@/components/Navigation";
@@ -14,6 +14,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { User, Edit, Save, X, Camera, Upload, Trash2 } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
+import RaasiImageDisplay from "@/components/RaasiImageDisplay";
 
 interface ProfileData {
   age: number;
@@ -45,6 +46,7 @@ interface RegistrationData {
   userId: string;
   status: string;
   submittedAt: Date;
+  envaranId?: string;
   
   // Personal Details
   name: string;
@@ -125,8 +127,11 @@ interface RegistrationData {
   
   // Additional Details
   otherDetails: string;
+  description: string;
   
-  // Profile Image
+  // Images
+  raasiImage?: string; // Base64 encoded Raasi chart image
+  profileImage?: string; // Base64 encoded profile image
   profileImageUrl?: string; // Base64 image data for profile photos
 }
 
@@ -155,58 +160,48 @@ export default function Profile() {
     }
 
     try {
-      // Fetch registration data first (since it contains all the detailed information)
+      // console.log('Fetching profile for user:', firebaseUser.uid);
+      
+      // First try to fetch registration data (preferred source)
       const registrationData = await getRegistrationByUserId(firebaseUser.uid);
       
       if (registrationData) {
-        console.log('Registration data fetched:', registrationData);
+        // console.log('Registration data fetched successfully:', registrationData);
         setRegistration(registrationData);
         
-                 // Create profile data from registration
-         const profileData: ProfileData = {
-           age: registrationData.dateOfBirth ? calculateAge(registrationData.dateOfBirth) : 0,
-           gender: registrationData.gender || '',
-           location: registrationData.presentAddress || '',
-           profession: registrationData.job || '',
-           professionOther: '',
-           bio: registrationData.otherDetails || '',
-           education: registrationData.qualification || '',
-           educationOther: '',
-           educationSpecification: '',
-           educationSpecificationOther: '',
-           relationshipStatus: registrationData.maritalStatus || '',
-           religion: registrationData.religion || '',
-           caste: registrationData.caste || '',
-           subCaste: registrationData.subCaste || '',
-           motherTongue: registrationData.motherTongue || '',
-           smoking: '',
-           drinking: '',
-           lifestyle: '',
-           hobbies: '',
-           kidsPreference: '',
-           verified: true,
-           profileImageUrl: registrationData.profileImageUrl || ''
-         };
-        console.log('Profile data created:', profileData);
+        // Create profile data from registration
+        const profileData: ProfileData = {
+          age: registrationData.dateOfBirth ? calculateAge(registrationData.dateOfBirth) : 0,
+          gender: registrationData.gender || '',
+          location: registrationData.presentAddress || '',
+          profession: registrationData.job || '',
+          professionOther: '',
+          bio: registrationData.otherDetails || '',
+          education: registrationData.qualification || '',
+          educationOther: '',
+          educationSpecification: '',
+          educationSpecificationOther: '',
+          relationshipStatus: registrationData.maritalStatus || '',
+          religion: registrationData.religion || '',
+          caste: registrationData.caste || '',
+          subCaste: registrationData.subCaste || '',
+          motherTongue: registrationData.motherTongue || '',
+          smoking: '',
+          drinking: '',
+          lifestyle: '',
+          hobbies: '',
+          kidsPreference: '',
+          verified: true,
+          profileImageUrl: registrationData.profileImageUrl || ''
+        };
+        
+        // console.log('Profile data created from registration:', profileData);
+        // console.log('Profile image URL from registration:', registrationData.profileImageUrl);
         setProfile(profileData);
       } else {
-        // Fallback to old profile data if no registration exists
-      const profileData = await getProfile(firebaseUser.uid);
-      
-      if (profileData) {
-        const mergedProfile = {
-          ...profileData,
-          age: profileData.age || (user?.dateOfBirth ? calculateAge(user.dateOfBirth) : 0),
-          gender: profileData.gender || user?.gender || '',
-          religion: profileData.religion || user?.religion || '',
-          caste: profileData.caste || user?.caste || '',
-          subCaste: profileData.subCaste || user?.subCaste || '',
-            profileImageUrl: profileData.profileImageUrl || user?.profileImageUrl || ''
-        };
-        setProfile(mergedProfile);
-      } else {
-          // Initialize empty profile
-        const initialProfile = {
+        // console.log('No registration data found, creating empty profile');
+        // Initialize empty profile if no data exists
+        const initialProfile: ProfileData = {
           age: user?.dateOfBirth ? calculateAge(user.dateOfBirth) : 0,
           gender: user?.gender || '',
           location: '',
@@ -227,30 +222,53 @@ export default function Profile() {
           lifestyle: '',
           hobbies: '',
           kidsPreference: '',
-            verified: false,
-            profileImageUrl: user?.profileImageUrl || ''
+          verified: false,
+          profileImageUrl: user?.profileImageUrl || ''
         };
         setProfile(initialProfile);
-        }
       }
     } catch (error) {
-      console.error('Error fetching profile:', error);
+      // console.error('Error fetching profile:', error);
+      toast({
+        title: "Error",
+        description: "Failed to load profile data. Please try again.",
+        variant: "destructive",
+      });
     } finally {
       setLoading(false);
     }
   };
 
   const calculateAge = (dateOfBirth: string) => {
-    const today = new Date();
-    const birthDate = new Date(dateOfBirth);
-    let age = today.getFullYear() - birthDate.getFullYear();
-    const monthDiff = today.getMonth() - birthDate.getMonth();
-    
-    if (monthDiff < 0 || (monthDiff === 0 && today.getDate() < birthDate.getDate())) {
-      age--;
+    try {
+      const today = new Date();
+      let birthDate: Date;
+      
+      // Handle DD-MM-YYYY format (common in Indian context)
+      if (dateOfBirth.includes('-') && dateOfBirth.split('-')[0].length === 2) {
+        const [day, month, year] = dateOfBirth.split('-');
+        birthDate = new Date(parseInt(year), parseInt(month) - 1, parseInt(day));
+      } else {
+        // Try parsing as is (for other formats)
+        birthDate = new Date(dateOfBirth);
+      }
+      
+      // Check if the date is valid
+      if (isNaN(birthDate.getTime())) {
+        // console.warn('Invalid date format:', dateOfBirth);
+        return 0;
+      }
+      
+      let age = today.getFullYear() - birthDate.getFullYear();
+      const monthDiff = today.getMonth() - birthDate.getMonth();
+      if (monthDiff < 0 || (monthDiff === 0 && today.getDate() < birthDate.getDate())) {
+        age--;
+      }
+      return age;
+    } catch (error) {
+      // console.error('Error calculating age for date:', dateOfBirth, error);
+      return 0;
     }
-    
-    return age;
   };
 
   const handleImageSelect = (event: React.ChangeEvent<HTMLInputElement>) => {
@@ -287,20 +305,96 @@ export default function Profile() {
     }
   };
 
+  // Image compression function
+  const compressImage = (file: File, maxWidth: number = 800, maxHeight: number = 800, quality: number = 0.8): Promise<string> => {
+    return new Promise((resolve, reject) => {
+      const canvas = document.createElement('canvas');
+      const ctx = canvas.getContext('2d');
+      const img = new Image();
+
+      img.onload = () => {
+        // Calculate new dimensions
+        let { width, height } = img;
+        
+        if (width > height) {
+          if (width > maxWidth) {
+            height = (height * maxWidth) / width;
+            width = maxWidth;
+          }
+        } else {
+          if (height > maxHeight) {
+            width = (width * maxHeight) / height;
+            height = maxHeight;
+          }
+        }
+
+        // Set canvas dimensions
+        canvas.width = width;
+        canvas.height = height;
+
+        // Draw and compress
+        ctx?.drawImage(img, 0, 0, width, height);
+        
+        // Convert to base64 with compression
+        const compressedBase64 = canvas.toDataURL('image/jpeg', quality);
+        
+        // Check if compressed image is still too large (Firestore limit is ~1MB)
+        const sizeInBytes = (compressedBase64.length * 3) / 4;
+        const maxSize = 900000; // ~900KB to be safe
+        
+        if (sizeInBytes > maxSize) {
+          // Try with lower quality
+          const lowerQuality = Math.max(0.1, quality - 0.2);
+          const newCompressedBase64 = canvas.toDataURL('image/jpeg', lowerQuality);
+          resolve(newCompressedBase64);
+        } else {
+          resolve(compressedBase64);
+        }
+      };
+
+      img.onerror = () => reject(new Error('Failed to load image'));
+      img.src = URL.createObjectURL(file);
+    });
+  };
+
   const handleImageUpload = async () => {
     if (!selectedImage || !firebaseUser) return;
 
     setUploadingPhoto(true);
     try {
-      // Convert image to base64
-      const reader = new FileReader();
-      const base64Promise = new Promise<string>((resolve) => {
-        reader.onload = () => {
-          resolve(reader.result as string);
-        };
+      // Check file size first (before compression)
+      const maxFileSize = 5 * 1024 * 1024; // 5MB
+      if (selectedImage.size > maxFileSize) {
+        toast({
+          title: "File too large",
+          description: "Please select an image smaller than 5MB.",
+          variant: "destructive",
+        });
+        setUploadingPhoto(false);
+        return;
+      }
+
+      // Compress image
+      toast({
+        title: "Compressing image...",
+        description: "Please wait while we optimize your image for upload.",
       });
-      reader.readAsDataURL(selectedImage);
-      const imageBase64 = await base64Promise;
+      
+      const imageBase64 = await compressImage(selectedImage);
+      
+      // Check final size
+      const sizeInBytes = (imageBase64.length * 3) / 4;
+      const maxSize = 900000; // ~900KB
+      
+      if (sizeInBytes > maxSize) {
+        toast({
+          title: "Image too large",
+          description: "Please select a smaller image or try a different format.",
+          variant: "destructive",
+        });
+        setUploadingPhoto(false);
+        return;
+      }
 
              // Update profile with base64 image data
        if (profile && registration) {
@@ -319,7 +413,7 @@ export default function Profile() {
            profileImageUrl: imageBase64
          });
          
-         console.log('✅ Profile photo updated in existing registration document using userId:', registration.id);
+         // console.log('✅ Profile photo updated in existing registration document using userId:', registration.id);
        }
 
              // Clear selected image and preview
@@ -337,7 +431,7 @@ export default function Profile() {
          description: "Your profile photo has been updated.",
        });
     } catch (error: any) {
-      console.error('Error uploading image:', error);
+      // console.error('Error uploading image:', error);
       
       toast({
         title: "Upload failed",
@@ -370,7 +464,7 @@ export default function Profile() {
            profileImageUrl: ''
          });
          
-         console.log('✅ Profile photo removed from existing registration document using userId:', registration.id);
+         // console.log('✅ Profile photo removed from existing registration document using userId:', registration.id);
        }
 
       toast({
@@ -378,7 +472,7 @@ export default function Profile() {
         description: "Your profile photo has been removed.",
       });
     } catch (error) {
-      console.error('Error removing photo:', error);
+      // console.error('Error removing photo:', error);
       toast({
         title: "Error",
         description: "Failed to remove photo. Please try again.",
@@ -406,7 +500,7 @@ export default function Profile() {
     
     setSaving(true);
     try {
-      console.log('Saving registration data:', editingRegistration);
+      // console.log('Saving registration data:', editingRegistration);
       
       // Update the registration document with the edited data
       const registrationRef = doc(db, 'registrations', editingRegistration.id);
@@ -478,24 +572,28 @@ export default function Profile() {
       
       // Additional Details
       if (editingRegistration.otherDetails) updateData.otherDetails = editingRegistration.otherDetails;
+      if (editingRegistration.description) updateData.description = editingRegistration.description;
       
-      console.log('Update data to be saved:', updateData);
+      // console.log('Update data to be saved:', updateData);
       
       // Test the update
       const result = await updateDoc(registrationRef, updateData);
-      console.log('Update result:', result);
+      // console.log('Update result:', result);
       
       // Update the main registration state
       setRegistration(editingRegistration);
       setEditingRegistration(null);
       setIsEditing(false);
       
+      // Refresh profile data to reflect changes
+      await fetchProfile();
+      
       toast({
         title: "Profile updated",
         description: "Your profile has been saved successfully.",
       });
     } catch (error) {
-      console.error('Error saving profile:', error);
+      // console.error('Error saving profile:', error);
       toast({
         title: "Save failed",
         description: "Failed to save profile. Please try again.",
@@ -525,12 +623,12 @@ export default function Profile() {
       <Navigation />
       
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
-          <div className="mb-8">
-            <h1 className="text-3xl font-bold text-gray-900">My Profile</h1>
-            <p className="text-gray-600 mt-2">Manage your profile information and preferences</p>
+          <div className="mb-6 sm:mb-8">
+            <h1 className="text-2xl sm:text-3xl font-bold text-gray-900 leading-tight">My Profile</h1>
+            <p className="text-sm sm:text-base text-gray-600 mt-2 leading-relaxed">Manage your profile information and preferences</p>
           </div>
 
-          <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
+          <div className="grid grid-cols-1 xl:grid-cols-3 gap-6 lg:gap-8">
           {/* User Summary Card */}
             <div className="lg:col-span-1">
               <Card>
@@ -540,7 +638,7 @@ export default function Profile() {
                   <div className="relative mb-6">
                     <Avatar className="w-32 h-32 mx-auto mb-4">
                       <AvatarImage 
-                        src={imagePreview || profile?.profileImageUrl || user?.profileImageUrl} 
+                        src={imagePreview || profile?.profileImageUrl || registration?.profileImageUrl || user?.profileImageUrl} 
                         alt="Profile"
                       />
                       <AvatarFallback className="text-3xl">
@@ -566,8 +664,11 @@ export default function Profile() {
                         disabled={uploadingPhoto}
                       >
                         <Camera className="h-4 w-4 mr-2" />
-                        {uploadingPhoto ? 'Uploading...' : 'Upload Photo'}
+                        {uploadingPhoto ? 'Uploading...' : 'Change Photo'}
                       </Button>
+                      <p className="text-xs text-gray-500 text-center">
+                        Max 5MB • JPG, PNG, GIF
+                      </p>
                       
                       {selectedImage && (
                         <div className="space-y-2">
@@ -599,7 +700,7 @@ export default function Profile() {
                       </div>
                     )}
                       
-                      {profile?.profileImageUrl && !selectedImage && (
+                      {(profile?.profileImageUrl || registration?.profileImageUrl) && !selectedImage && (
                         <Button
                           variant="outline"
                           size="sm"
@@ -616,6 +717,64 @@ export default function Profile() {
                   <h3 className="text-lg font-semibold text-gray-900 mb-2">
                     {registration?.name || user?.fullName || user?.email}
                   </h3>
+                  {registration?.envaranId && (
+                    <div className="mb-4">
+                      <Label htmlFor="envaranId">Envaran ID</Label>
+                      <p className="text-blue-600 font-mono font-bold py-2">{registration.envaranId}</p>
+                    </div>
+                  )}
+                  
+                  {/* Description Section */}
+                  <div className="mb-6">
+                    <Label htmlFor="description">Description</Label>
+                    {isEditing ? (
+                      <Textarea
+                        id="description"
+                        value={editingRegistration?.description || ''}
+                        onChange={(e) => setEditingRegistration(prev => prev ? { ...prev, description: e.target.value } : null)}
+                        placeholder="Tell others about yourself, your interests, hobbies, what you're looking for in a partner..."
+                        rows={4}
+                        className="mt-2 resize-none"
+                      />
+                    ) : (
+                      <p className="text-gray-900 py-2 mt-2 whitespace-pre-wrap">
+                        {registration?.description || 'No description provided yet.'}
+                      </p>
+                    )}
+                    <p className="text-sm text-gray-500 mt-1">
+                      This description helps others get to know you better.
+                    </p>
+                  </div>
+                  
+                  {/* Complete Registration Notice */}
+                  {registration?.id === 'temp' && (
+                    <div className="mb-6 p-4 bg-yellow-50 border border-yellow-200 rounded-lg">
+                      <div className="flex items-center">
+                        <div className="flex-shrink-0">
+                          <svg className="h-5 w-5 text-yellow-400" viewBox="0 0 20 20" fill="currentColor">
+                            <path fillRule="evenodd" d="M8.257 3.099c.765-1.36 2.722-1.36 3.486 0l5.58 9.92c.75 1.334-.213 2.98-1.742 2.98H4.42c-1.53 0-2.493-1.646-1.743-2.98l5.58-9.92zM11 13a1 1 0 11-2 0 1 1 0 012 0zm-1-8a1 1 0 00-1 1v3a1 1 0 002 0V6a1 1 0 00-1-1z" clipRule="evenodd" />
+                          </svg>
+                        </div>
+                        <div className="ml-3">
+                          <h3 className="text-sm font-medium text-yellow-800">
+                            Complete Your Registration
+                          </h3>
+                          <div className="mt-2 text-sm text-yellow-700">
+                            <p>You have a basic profile. Complete the full registration to unlock all features and get better matches.</p>
+                            <div className="mt-2">
+                              <Button
+                                size="sm"
+                                className="bg-yellow-600 hover:bg-yellow-700 text-white"
+                                onClick={() => window.location.href = '/register'}
+                              >
+                                Complete Registration
+                              </Button>
+                            </div>
+                          </div>
+                        </div>
+                      </div>
+                    </div>
+                  )}
                   
                   <p className="text-gray-600 mb-4">{user?.email}</p>
                   
@@ -657,12 +816,12 @@ export default function Profile() {
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                   <div>
                       <Label htmlFor="age">Age</Label>
-                      <p className="text-gray-900 py-2">{registration?.dateOfBirth ? calculateAge(registration.dateOfBirth) : 'Not specified'}</p>
+                      <p className="text-gray-900 py-2">{profile?.age || 'Not specified'}</p>
                     </div>
 
                   <div>
                       <Label htmlFor="gender">Gender</Label>
-                      <p className="text-gray-900 py-2 capitalize">{registration?.gender || 'Not specified'}</p>
+                      <p className="text-gray-900 py-2 capitalize">{profile?.gender || 'Not specified'}</p>
                     </div>
 
                   <div>
@@ -675,7 +834,7 @@ export default function Profile() {
                         placeholder="City, State"
                       />
                     ) : (
-                      <p className="text-gray-900 py-2">{registration?.presentAddress || 'Not specified'}</p>
+                      <p className="text-gray-900 py-2">{profile?.location || 'Not specified'}</p>
                     )}
                     </div>
 
@@ -689,7 +848,7 @@ export default function Profile() {
                         placeholder="Enter your profession"
                       />
                     ) : (
-                      <p className="text-gray-900 py-2">{registration?.job || 'Not specified'}</p>
+                      <p className="text-gray-900 py-2">{profile?.profession || 'Not specified'}</p>
                     )}
                     </div>
 
@@ -703,13 +862,13 @@ export default function Profile() {
                         placeholder="Enter your education"
                       />
                     ) : (
-                      <p className="text-gray-900 py-2">{registration?.qualification || 'Not specified'}</p>
+                      <p className="text-gray-900 py-2">{profile?.education || 'Not specified'}</p>
                     )}
                     </div>
 
                   <div>
                       <Label htmlFor="relationshipStatus">Relationship Status</Label>
-                      <p className="text-gray-900 py-2">{registration?.maritalStatus || 'Not specified'}</p>
+                      <p className="text-gray-900 py-2">{profile?.relationshipStatus || 'Not specified'}</p>
                     </div>
                     </div>
 
@@ -1057,17 +1216,22 @@ export default function Profile() {
                           <p className="text-gray-900 py-2">{registration.star || 'Not specified'}</p>
                         )}
                       </div>
-                      <div>
-                        <Label>Raasi</Label>
-                        {isEditing ? (
-                          <Input
-                            value={editingRegistration?.raasi || ''}
-                            onChange={(e) => setEditingRegistration(prev => prev ? { ...prev, raasi: e.target.value } : null)}
-                            placeholder="e.g., Taurus"
+                      <div className="md:col-span-2">
+                        <Label>Jaadhagam (Raasi) Chart</Label>
+                        <div className="mt-2">
+                          <RaasiImageDisplay
+                            raasiImage={registration.raasiImage}
+                            isOwner={true}
+                            isPremium={false}
+                            onUpgrade={() => {
+                              // Handle upgrade to premium
+                              toast({
+                                title: "Upgrade to Premium",
+                                description: "Contact support to upgrade your account and view all Raasi charts.",
+                              });
+                            }}
                           />
-                        ) : (
-                          <p className="text-gray-900 py-2">{registration.raasi || 'Not specified'}</p>
-                        )}
+                        </div>
                       </div>
                       <div>
                         <Label>Gothram</Label>

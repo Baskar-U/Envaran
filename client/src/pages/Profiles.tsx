@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import React, { useState, useEffect } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { useAuth } from "@/hooks/useAuth";
 import { useToast } from "@/hooks/use-toast";
@@ -26,57 +26,54 @@ export default function Profiles() {
     relationshipStatus: "all",
     verified: "all",
   });
+  const [isDesktop, setIsDesktop] = useState(false);
 
+  // Handle screen size detection for responsive ads
   useEffect(() => {
-    if (!loading && !firebaseUser) {
-      toast({
-        title: "Unauthorized",
-        description: "You are logged out. Logging in again...",
-        variant: "destructive",
-      });
-      setTimeout(() => {
-        window.location.href = "/login";
-      }, 500);
-      return;
-    }
-  }, [firebaseUser, loading, toast]);
+    const checkScreenSize = () => {
+      setIsDesktop(window.innerWidth >= 1024);
+    };
+    
+    checkScreenSize();
+    window.addEventListener('resize', checkScreenSize);
+    
+    return () => window.removeEventListener('resize', checkScreenSize);
+  }, []);
+
+  // Remove authentication requirement - page now works for all users
 
   const { data: profilesData, isLoading: profilesLoading, refetch } = useQuery({
     queryKey: ["registration-profiles"],
     queryFn: async () => {
-      if (!firebaseUser) {
-        console.log('No firebase user, returning empty profiles');
-        return { profiles: [], lastDoc: null };
-      }
-      console.log('Fetching profiles from registrations for user:', firebaseUser.uid);
-      const result = await getProfilesFromRegistrations(firebaseUser.uid);
-      console.log('Registration profiles fetched:', result.profiles);
-      console.log('Number of profiles:', result.profiles.length);
+      // console.log('Fetching profiles from registrations');
+      // Pass undefined for excludeUserId if no user is logged in, or the user's ID if they are logged in
+      const excludeUserId = firebaseUser ? firebaseUser.uid : undefined;
+      const result = await getProfilesFromRegistrations(excludeUserId);
+      // console.log('Registration profiles fetched:', result.profiles);
+      // console.log('Number of profiles:', result.profiles.length);
       return result;
     },
-    enabled: !!firebaseUser,
+    enabled: true, // Always enabled for all users
     staleTime: 0, // Always consider data stale to force fresh fetch
     refetchOnWindowFocus: true, // Refetch when window gains focus
   });
 
   // Force refresh when component mounts to get latest data
   useEffect(() => {
-    if (firebaseUser) {
-      console.log('Forcing profiles refresh on mount...');
-      refetch();
-    }
-  }, [firebaseUser, refetch]);
+    // console.log('Forcing profiles refresh on mount...');
+    refetch();
+  }, [refetch]);
 
   const profiles = profilesData?.profiles || [];
-  console.log('Current profiles state:', profiles);
+  // console.log('Current profiles state:', profiles);
   
   // Debug profile images
   profiles.forEach((profile: Profile & { user: User }, index: number) => {
-    console.log(`Profile ${index + 1} (${profile.user.firstName}):`, {
-      userId: profile.userId,
-      profileImageUrl: profile.user.profileImageUrl ? 'Has image' : 'No image',
-      profileImageUrlLength: profile.user.profileImageUrl?.length || 0
-    });
+    // console.log(`Profile ${index + 1} (${profile.user.firstName}):`, {
+    //   userId: profile.userId,
+    //   profileImageUrl: profile.user.profileImageUrl ? 'Has image' : 'No image',
+    //   profileImageUrlLength: profile.user.profileImageUrl?.length || 0
+    // });
   });
 
   const filteredProfiles = profiles.filter((profile: Profile & { user: User }) => {
@@ -120,22 +117,20 @@ export default function Profiles() {
     );
   }
 
-  if (!firebaseUser) {
-    return null;
-  }
+  // Remove authentication check - page now works for all users
 
   return (
     <div className="min-h-screen bg-gray-50 pb-16 md:pb-0" data-testid="profiles-page">
       <Navigation />
 
       {/* Header Section */}
-      <section className="bg-gradient-to-br from-royal-blue to-blue-800 text-white py-16" data-testid="profiles-header">
+      <section className="bg-gradient-to-br from-royal-blue to-blue-800 text-white py-12 sm:py-16" data-testid="profiles-header">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="text-center">
-            <h1 className="text-4xl lg:text-5xl font-poppins font-bold mb-6" data-testid="text-profiles-title">
+            <h1 className="text-3xl sm:text-4xl lg:text-5xl font-poppins font-bold mb-4 sm:mb-6 leading-tight" data-testid="text-profiles-title">
               Find Your <span className="text-gold">Perfect Match</span>
             </h1>
-            <p className="text-xl text-blue-100 mb-8 max-w-3xl mx-auto" data-testid="text-profiles-description">
+            <p className="text-base sm:text-lg lg:text-xl text-blue-100 mb-6 sm:mb-8 max-w-3xl mx-auto leading-relaxed" data-testid="text-profiles-description">
               Browse through verified profiles of individuals seeking meaningful relationships - whether single, divorced, widowed, or separated
             </p>
           </div>
@@ -302,9 +297,19 @@ export default function Profiles() {
                 </div>
               </div>
               
-              <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-8" data-testid="profiles-grid">
-                {filteredProfiles.map((profile: Profile & { user: User }) => (
-                  <ProfileCard key={profile.id} profile={profile} />
+              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6 lg:gap-8" data-testid="profiles-grid">
+                {filteredProfiles.map((profile: Profile & { user: User }, index: number) => (
+                  <React.Fragment key={profile.id}>
+                    <ProfileCard profile={profile} />
+                    {/* Ad - Every 4 profiles */}
+                    {(index + 1) % 4 === 0 ? (
+                      <div className="w-full">
+                        <script async src="https://pagead2.googlesyndication.com/pagead/js/adsbygoogle.js?client=ca-pub-6343948689807963" crossOrigin="anonymous"></script>
+                        <ins className="adsbygoogle" style={{display: 'block'}} data-ad-client="ca-pub-6343948689807963" data-ad-slot="7677540697" data-ad-format="auto" data-full-width-responsive="true"></ins>
+                        <script dangerouslySetInnerHTML={{ __html: '(adsbygoogle = window.adsbygoogle || []).push({});' }}></script>
+                      </div>
+                    ) : null}
+                  </React.Fragment>
                 ))}
               </div>
               

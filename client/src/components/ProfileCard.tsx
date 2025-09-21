@@ -41,7 +41,7 @@ export default function ProfileCard({ profile }: ProfileCardProps) {
         const snapshot = await getDocs(likesQuery);
         setLiked(!snapshot.empty);
       } catch (error) {
-        console.error('Error checking if profile is liked:', error);
+        // console.error('Error checking if profile is liked:', error);
       } finally {
         setLoadingLike(false);
       }
@@ -98,7 +98,7 @@ export default function ProfileCard({ profile }: ProfileCardProps) {
   };
 
   // Debug profile image
-  console.log(`ProfileCard for ${profile.user.firstName}: profileImageUrl =`, profile.user.profileImageUrl ? 'Has image' : 'No image');
+  // console.log(`ProfileCard for ${profile.user.firstName}: profileImageUrl =`, profile.user.profileImageUrl ? 'Has image' : 'No image');
 
   return (
     <Card className="overflow-hidden card-hover" data-testid={`card-profile-${profile.id}`}>
@@ -106,7 +106,7 @@ export default function ProfileCard({ profile }: ProfileCardProps) {
         <img
           src={profile.user.profileImageUrl || `https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?ixlib=rb-4.0.3&auto=format&fit=crop&w=400&h=500`}
           alt={`${profile.user.firstName} ${profile.user.lastName}`}
-          className="w-full h-64 object-cover"
+          className="w-full h-auto max-h-96 object-contain"
           data-testid={`img-profile-${profile.id}`}
         />
         <div className="absolute top-4 right-4">
@@ -129,11 +129,13 @@ export default function ProfileCard({ profile }: ProfileCardProps) {
           {profile.user.fullName || `${profile.user.firstName} ${profile.user.lastName?.charAt(0) || ''}.`}
         </h3>
         
+        <div className="mb-2">
+          <p className="text-sm text-blue-600 font-mono font-bold" data-testid={`text-envaranid-${profile.id}`}>
+            {(profile as any).envaranId || 'ID: Not assigned'}
+          </p>
+        </div>
+        
         <div className="space-y-2 mb-4">
-          <div className="flex items-center text-gray-600">
-            <MapPin className="mr-2 h-4 w-4" />
-            <span data-testid={`text-location-${profile.id}`}>{profile.location}</span>
-          </div>
           <div className="flex items-center text-gray-600">
             <Calendar className="mr-2 h-4 w-4" />
             <span data-testid={`text-age-${profile.id}`}>{profile.age} years</span>
@@ -233,28 +235,44 @@ export default function ProfileCard({ profile }: ProfileCardProps) {
         )}
         
         <div className="flex space-x-3">
-          <Button
-            onClick={handleLike}
-            disabled={liked || likeMutation.isPending || loadingLike}
-            className={`flex-1 transition-colors ${
-              liked 
-                ? 'bg-green-500 hover:bg-green-600' 
-                : 'bg-royal-blue hover:bg-blue-700'
-            } text-white`}
-            data-testid={`button-like-${profile.id}`}
-          >
-            <Heart className={`mr-2 h-4 w-4 ${liked ? 'fill-current' : ''}`} />
-            {loadingLike ? 'Loading...' : liked ? 'Liked' : likeMutation.isPending ? 'Liking...' : 'Like'}
-          </Button>
-          <Link href={`/view-profile/${profile.userId}`}>
-            <Button
-              variant="outline"
-              className="flex-1 border-royal-blue text-royal-blue hover:bg-royal-blue hover:text-white transition-colors"
-              data-testid={`button-view-profile-${profile.id}`}
-            >
-              View Profile
-            </Button>
-          </Link>
+          {firebaseUser ? (
+            // Logged-in user: Show both Like and View Profile buttons
+            <>
+              <Button
+                onClick={handleLike}
+                disabled={liked || likeMutation.isPending || loadingLike}
+                className={`flex-1 transition-colors ${
+                  liked 
+                    ? 'bg-green-500 hover:bg-green-600' 
+                    : 'bg-royal-blue hover:bg-blue-700'
+                } text-white`}
+                data-testid={`button-like-${profile.id}`}
+              >
+                <Heart className={`mr-2 h-4 w-4 ${liked ? 'fill-current' : ''}`} />
+                {loadingLike ? 'Loading...' : liked ? 'Liked' : likeMutation.isPending ? 'Liking...' : 'Like'}
+              </Button>
+              <Link href={`/view-profile/${profile.userId}`}>
+                <Button
+                  variant="outline"
+                  className="flex-1 border-royal-blue text-royal-blue hover:bg-royal-blue hover:text-white transition-colors"
+                  data-testid={`button-view-profile-${profile.id}`}
+                >
+                  View Profile
+                </Button>
+              </Link>
+            </>
+          ) : (
+            // Non-logged-in user: Show only View Profile button (full width)
+            <Link href={`/view-profile/${profile.userId}`}>
+              <Button
+                variant="outline"
+                className="w-full border-royal-blue text-royal-blue hover:bg-royal-blue hover:text-white transition-colors"
+                data-testid={`button-view-profile-${profile.id}`}
+              >
+                View Profile
+              </Button>
+            </Link>
+          )}
         </div>
       </CardContent>
     </Card>

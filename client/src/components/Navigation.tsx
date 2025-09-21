@@ -35,7 +35,7 @@ export default function Navigation() {
           const data = await getRegistrationByUserId(firebaseUser.uid);
           setRegistrationData(data);
         } catch (error) {
-          console.error('Error fetching registration data for navigation:', error);
+          // console.error('Error fetching registration data for navigation:', error);
         }
       }
     };
@@ -63,7 +63,7 @@ export default function Navigation() {
       // Redirect to landing page after logout
       window.location.href = '/';
     } catch (error) {
-      console.error("Error logging out:", error);
+      // console.error("Error logging out:", error);
     }
   };
 
@@ -77,9 +77,9 @@ export default function Navigation() {
       <div className="fixed bottom-0 left-0 right-0 bg-white border-t border-gray-200 z-50 md:hidden">
         <div className="flex justify-around items-center h-16">
           <Link
-            href="/home"
+            href="/"
             className={`flex flex-col items-center justify-center flex-1 h-full ${
-              isActive("/home")
+              isActive("/")
                 ? "text-royal-blue"
                 : "text-gray-600"
             }`}
@@ -97,7 +97,7 @@ export default function Navigation() {
             }`}
           >
             <Users className="h-5 w-5 mb-1" />
-            <span className="text-xs">Profiles</span>
+            <span className="text-xs">Browse Profile</span>
           </Link>
           
           <Link
@@ -113,18 +113,6 @@ export default function Navigation() {
           </Link>
           
           <Link
-            href="/events"
-            className={`flex flex-col items-center justify-center flex-1 h-full ${
-              isActive("/events")
-                ? "text-royal-blue"
-                : "text-gray-600"
-            }`}
-          >
-            <Calendar className="h-5 w-5 mb-1" />
-            <span className="text-xs">Events</span>
-          </Link>
-          
-          <Link
             href="/profile"
             className={`flex flex-col items-center justify-center flex-1 h-full ${
               isActive("/profile")
@@ -135,8 +123,6 @@ export default function Navigation() {
             <User className="h-5 w-5 mb-1" />
             <span className="text-xs">Profile</span>
           </Link>
-          
-
         </div>
       </div>
     );
@@ -150,61 +136,73 @@ export default function Navigation() {
             {/* Logo */}
             <Link href="/" className="flex items-center space-x-2">
               <img src="/logo.jpg" alt="Envaran Matrimony" className="h-8 w-8 rounded-full" />
-              <span className="text-xl font-bold text-gray-900">Envaran Matrimony</span>
+              <div className="flex flex-col">
+                <span className="text-xl font-bold text-gray-900">Envaran Matrimony</span>
+              </div>
             </Link>
 
             {/* Right side - Navigation Links and Auth buttons */}
             <div className="flex items-center space-x-8">
-              {/* Navigation Links */}
+              {/* Navigation Links - Different for logged in vs not logged in */}
               <div className="hidden md:flex items-center space-x-8">
                 <Link
-                  href="/home"
+                  href="/"
                   className={`text-sm font-medium transition-colors ${
-                    isActive("/home")
+                    isActive("/")
                       ? "text-royal-blue"
                       : "text-gray-600 hover:text-royal-blue"
                   }`}
                 >
                   Home
                 </Link>
-                <Link
-                  href="/profiles"
-                  className={`text-sm font-medium transition-colors ${
-                    isActive("/profiles")
-                      ? "text-royal-blue"
-                      : "text-gray-600 hover:text-royal-blue"
-                  }`}
-                >
-                  Find Matches
-                </Link>
-                <Link
-                  href="/events"
-                  className={`text-sm font-medium transition-colors ${
-                    isActive("/events")
-                      ? "text-royal-blue"
-                      : "text-gray-600 hover:text-royal-blue"
-                  }`}
-                >
-                  Events
-                </Link>
-                <Link
-                  href="/about"
-                  className={`text-sm font-medium transition-colors ${
-                    isActive("/about")
-                      ? "text-royal-blue"
-                      : "text-gray-600 hover:text-royal-blue"
-                  }`}
-                >
-                  About Us
-                </Link>
+                
+                {firebaseUser && !loading ? (
+                  // Logged in user navigation
+                  <>
+                    <Link
+                      href="/profiles"
+                      className={`text-sm font-medium transition-colors ${
+                        isActive("/profiles")
+                          ? "text-royal-blue"
+                          : "text-gray-600 hover:text-royal-blue"
+                      }`}
+                    >
+                      Browse Profile
+                    </Link>
+                    <Link
+                      href="/matches"
+                      className={`text-sm font-medium transition-colors ${
+                        isActive("/matches")
+                          ? "text-royal-blue"
+                          : "text-gray-600 hover:text-royal-blue"
+                      }`}
+                    >
+                      Matches
+                    </Link>
+                  </>
+                ) : (
+                  // Not logged in user navigation
+                  <>
+                    <Link
+                      href="/profiles"
+                      className={`text-sm font-medium transition-colors ${
+                        isActive("/profiles")
+                          ? "text-royal-blue"
+                          : "text-gray-600 hover:text-royal-blue"
+                      }`}
+                    >
+                      Browse Profiles
+                    </Link>
+                  </>
+                )}
               </div>
 
               {/* Auth buttons or user menu */}
               <div className="flex items-center space-x-4">
-                          {firebaseUser && !loading ? (
-              <>
-                {/* Notification Bell */}
-                <NotificationsDropdown />
+                {firebaseUser && !loading ? (
+                  <>
+                    {/* Notification Bell for logged in users */}
+                    <NotificationsDropdown />
 
                   {/* User Profile Dropdown */}
                   <div ref={dropdownRef} className="relative">
@@ -214,9 +212,17 @@ export default function Navigation() {
                       className="flex items-center space-x-2"
                       onClick={() => setIsDropdownOpen(!isDropdownOpen)}
                     >
-                      <div className="w-8 h-8 rounded-full bg-royal-blue flex items-center justify-center text-white text-sm font-semibold">
-                        {registrationData?.name?.charAt(0) || user?.firstName?.charAt(0) || user?.fullName?.charAt(0) || firebaseUser?.displayName?.charAt(0) || "U"}
-                      </div>
+                      {registrationData?.profileImageUrl ? (
+                        <img
+                          src={registrationData.profileImageUrl}
+                          alt="Profile"
+                          className="w-8 h-8 rounded-full object-cover"
+                        />
+                      ) : (
+                        <div className="w-8 h-8 rounded-full bg-royal-blue flex items-center justify-center text-white text-sm font-semibold">
+                          {registrationData?.name?.charAt(0) || user?.firstName?.charAt(0) || user?.fullName?.charAt(0) || firebaseUser?.displayName?.charAt(0) || "U"}
+                        </div>
+                      )}
                       <div className="hidden sm:flex flex-col items-start">
                         <span className="text-sm font-medium">
                           {registrationData?.name || user?.firstName || user?.fullName || firebaseUser?.displayName || "User"}
@@ -333,7 +339,7 @@ export default function Navigation() {
                 <>
                   <Link href="/login">
                     <Button variant="ghost" size="sm">
-                      Sign In
+                      Login
                     </Button>
                   </Link>
                   <Link href="/registration">

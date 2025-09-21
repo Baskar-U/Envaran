@@ -25,7 +25,7 @@ export default function ProtectedRoute({ children, redirectTo = '/login' }: Prot
 
   // Redirect to login if user is not authenticated
   if (!user) {
-    console.log('User not authenticated, redirecting to login');
+    // console.log('User not authenticated, redirecting to login');
     setLocation(redirectTo);
     return null;
   }

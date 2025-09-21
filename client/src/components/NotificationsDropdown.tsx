@@ -37,7 +37,7 @@ export default function NotificationsDropdown() {
       const userNotifications = await getUserNotifications(firebaseUser.uid);
       setNotifications(userNotifications);
     } catch (error) {
-      console.error('Error fetching notifications:', error);
+      // console.error('Error fetching notifications:', error);
     } finally {
       setLoading(false);
     }
@@ -52,7 +52,7 @@ export default function NotificationsDropdown() {
         )
       );
     } catch (error) {
-      console.error('Error marking notification as read:', error);
+      // console.error('Error marking notification as read:', error);
     }
   };
 

@@ -10,7 +10,7 @@ export default function Login() {
   const [isLogin, setIsLogin] = useState(true);
 
   const handleSuccess = () => {
-    setLocation("/home");
+    setLocation("/");
   };
 
   const handleSwitchToRegister = () => {

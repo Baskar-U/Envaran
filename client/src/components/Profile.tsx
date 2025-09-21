@@ -1,6 +1,8 @@
 import { useState, useEffect, useRef } from "react";
 import { useAuth } from "@/hooks/useAuth";
-import { getProfile, updateProfile, createProfile, getRegistrationByUserId } from "@/lib/firebaseAuth";
+import { getRegistrationByUserId } from "@/lib/firebaseAuth";
+import { db } from "@/lib/firebase";
+import { doc, updateDoc } from "firebase/firestore";
 
 import Navigation from "@/components/Navigation";
 import Footer from "@/components/Footer";
@@ -154,7 +156,7 @@ export default function Profile() {
       const registrationData = await getRegistrationByUserId(firebaseUser.uid);
       
       if (registrationData) {
-        console.log('Registration data fetched:', registrationData);
+        // console.log('Registration data fetched:', registrationData);
         setRegistration(registrationData);
         
         // Create profile data from registration
@@ -182,70 +184,73 @@ export default function Profile() {
           verified: true,
           profileImageUrl: registrationData.profileImageUrl || ''
         };
-        console.log('Profile data created:', profileData);
+        // console.log('Profile data created:', profileData);
         setProfile(profileData);
       } else {
-        // Fallback to old profile data if no registration exists
-        const profileData = await getProfile(firebaseUser.uid);
-        
-        if (profileData) {
-          const mergedProfile = {
-            ...profileData,
-            age: profileData.age || (user?.dateOfBirth ? calculateAge(user.dateOfBirth) : 0),
-            gender: profileData.gender || user?.gender || '',
-            religion: profileData.religion || user?.religion || '',
-            caste: profileData.caste || user?.caste || '',
-            subCaste: profileData.subCaste || user?.subCaste || '',
-            profileImageUrl: profileData.profileImageUrl || user?.profileImageUrl || ''
-          };
-          setProfile(mergedProfile);
-        } else {
-          // Initialize empty profile
-          const initialProfile = {
-            age: user?.dateOfBirth ? calculateAge(user.dateOfBirth) : 0,
-            gender: user?.gender || '',
-            location: '',
-            profession: '',
-            professionOther: '',
-            bio: '',
-            education: '',
-            educationOther: '',
-            educationSpecification: '',
-            educationSpecificationOther: '',
-            relationshipStatus: '',
-            religion: user?.religion || '',
-            caste: user?.caste || '',
-            subCaste: user?.subCaste || '',
-            motherTongue: '',
-            smoking: '',
-            drinking: '',
-            lifestyle: '',
-            hobbies: '',
-            kidsPreference: '',
-            verified: false,
-            profileImageUrl: user?.profileImageUrl || ''
-          };
-          setProfile(initialProfile);
-        }
+        // Initialize empty profile if no registration exists
+        const initialProfile: ProfileData = {
+          age: user?.dateOfBirth ? calculateAge(user.dateOfBirth) : 0,
+          gender: user?.gender || '',
+          location: '',
+          profession: '',
+          professionOther: '',
+          bio: '',
+          education: '',
+          educationOther: '',
+          educationSpecification: '',
+          educationSpecificationOther: '',
+          relationshipStatus: '',
+          religion: user?.religion || '',
+          caste: user?.caste || '',
+          subCaste: user?.subCaste || '',
+          motherTongue: '',
+          smoking: '',
+          drinking: '',
+          lifestyle: '',
+          hobbies: '',
+          kidsPreference: '',
+          verified: false,
+          profileImageUrl: user?.profileImageUrl || ''
+        };
+        setProfile(initialProfile);
       }
     } catch (error) {
-      console.error('Error fetching profile:', error);
+      // console.error('Error fetching profile:', error);
     } finally {
       setLoading(false);
     }
   };
 
   const calculateAge = (dateOfBirth: string) => {
-    const today = new Date();
-    const birthDate = new Date(dateOfBirth);
-    let age = today.getFullYear() - birthDate.getFullYear();
-    const monthDiff = today.getMonth() - birthDate.getMonth();
-    
-    if (monthDiff < 0 || (monthDiff === 0 && today.getDate() < birthDate.getDate())) {
-      age--;
+    try {
+      const today = new Date();
+      let birthDate: Date;
+      
+      // Handle DD-MM-YYYY format (common in Indian context)
+      if (dateOfBirth.includes('-') && dateOfBirth.split('-')[0].length === 2) {
+        const [day, month, year] = dateOfBirth.split('-');
+        birthDate = new Date(parseInt(year), parseInt(month) - 1, parseInt(day));
+      } else {
+        // Try parsing as is (for other formats)
+        birthDate = new Date(dateOfBirth);
+      }
+      
+      // Check if the date is valid
+      if (isNaN(birthDate.getTime())) {
+        // console.warn('Invalid date format:', dateOfBirth);
+        return 0;
+      }
+      
+      let age = today.getFullYear() - birthDate.getFullYear();
+      const monthDiff = today.getMonth() - birthDate.getMonth();
+      if (monthDiff < 0 || (monthDiff === 0 && today.getDate() < birthDate.getDate())) {
+        age--;
+      }
+      return age;
+    } catch (error) {
+      // console.error('Error calculating age for date:', dateOfBirth, error);
+      return 0;
     }
-    
-    return age;
   };
 
   const handleImageSelect = (event: React.ChangeEvent<HTMLInputElement>) => {
@@ -314,7 +319,7 @@ export default function Profile() {
            profileImageUrl: imageBase64
          });
          
-         console.log('✅ Profile photo updated in existing registration document using userId:', registration.id);
+         // console.log('✅ Profile photo updated in existing registration document using userId:', registration.id);
        }
 
       // Clear selected image and preview
@@ -332,7 +337,7 @@ export default function Profile() {
         description: "Your profile photo has been updated.",
       });
     } catch (error) {
-      console.error('Error uploading image:', error);
+      // console.error('Error uploading image:', error);
       toast({
         title: "Upload failed",
         description: "Failed to upload image. Please try again.",
@@ -364,7 +369,7 @@ export default function Profile() {
            profileImageUrl: ''
          });
          
-         console.log('✅ Profile photo removed from existing registration document using userId:', registration.id);
+         // console.log('✅ Profile photo removed from existing registration document using userId:', registration.id);
        }
 
       toast({
@@ -372,7 +377,7 @@ export default function Profile() {
         description: "Your profile photo has been removed.",
       });
     } catch (error) {
-      console.error('Error removing photo:', error);
+      // console.error('Error removing photo:', error);
       toast({
         title: "Error",
         description: "Failed to remove photo. Please try again.",
@@ -382,22 +387,38 @@ export default function Profile() {
   };
 
   const handleSave = async () => {
-    if (!profile || !firebaseUser) return;
+    if (!profile || !firebaseUser || !registration) return;
     
     setSaving(true);
     try {
-      const profileData = {
-        userId: firebaseUser.uid,
-        ...profile,
-        verified: profile?.verified || false
+      // Update the registration document with the edited profile data
+      const registrationRef = doc(db, 'registrations', registration.id);
+      
+      // Create update object with all editable fields
+      const updateData: any = {
+        updatedAt: new Date()
       };
-
-      const existingProfile = await getProfile(firebaseUser.uid);
-      if (existingProfile) {
-        await updateProfile(firebaseUser.uid, profileData);
-      } else {
-        await createProfile(profileData);
+      
+      // Map profile data to registration fields
+      if (profile.age) updateData.age = profile.age;
+      if (profile.gender) updateData.gender = profile.gender;
+      if (profile.location) updateData.presentAddress = profile.location;
+      if (profile.profession) updateData.job = profile.profession;
+      if (profile.education) updateData.qualification = profile.education;
+      if (profile.relationshipStatus) updateData.maritalStatus = profile.relationshipStatus;
+      if (profile.religion) updateData.religion = profile.religion;
+      if (profile.caste) updateData.caste = profile.caste;
+      if (profile.subCaste) updateData.subCaste = profile.subCaste;
+      if (profile.motherTongue) updateData.motherTongue = profile.motherTongue;
+      if (profile.bio) updateData.otherDetails = profile.bio;
+      if (profile.profileImageUrl) updateData.profileImageUrl = profile.profileImageUrl;
+      
+      // Update description if it exists in registration
+      if ((registration as any).description !== undefined) {
+        updateData.description = (registration as any).description;
       }
+      
+      await updateDoc(registrationRef, updateData);
       
       setIsEditing(false);
       await fetchProfile(); // Refresh profile data
@@ -407,7 +428,7 @@ export default function Profile() {
         description: "Your profile has been saved successfully.",
       });
     } catch (error) {
-      console.error('Error saving profile:', error);
+      // console.error('Error saving profile:', error);
       toast({
         title: "Save failed",
         description: "Failed to save profile. Please try again.",
@@ -442,7 +463,7 @@ export default function Profile() {
           <p className="text-gray-600 mt-2">Manage your profile information and preferences</p>
         </div>
 
-        <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
+        <div className="grid grid-cols-1 xl:grid-cols-3 gap-6 lg:gap-8">
           {/* User Summary Card */}
           <div className="lg:col-span-1">
             <Card>
@@ -478,7 +499,7 @@ export default function Profile() {
                         disabled={uploadingPhoto}
                       >
                         <Camera className="h-4 w-4 mr-2" />
-                        {uploadingPhoto ? 'Uploading...' : 'Upload Photo'}
+                        {uploadingPhoto ? 'Uploading...' : 'Change Photo'}
                       </Button>
                       
                       {selectedImage && (

@@ -29,14 +29,35 @@ import { auth, db } from './firebase';
 
 // Helper function to calculate age from date of birth
 const calculateAge = (dateOfBirth: string) => {
-  const today = new Date();
-  const birthDate = new Date(dateOfBirth);
-  let age = today.getFullYear() - birthDate.getFullYear();
-  const monthDiff = today.getMonth() - birthDate.getMonth();
-  if (monthDiff < 0 || (monthDiff === 0 && today.getDate() < birthDate.getDate())) {
-    age--;
+  try {
+    const today = new Date();
+    let birthDate: Date;
+    
+    // Handle DD-MM-YYYY format (common in Indian context)
+    if (dateOfBirth.includes('-') && dateOfBirth.split('-')[0].length === 2) {
+      const [day, month, year] = dateOfBirth.split('-');
+      birthDate = new Date(parseInt(year), parseInt(month) - 1, parseInt(day));
+    } else {
+      // Try parsing as is (for other formats)
+      birthDate = new Date(dateOfBirth);
+    }
+    
+    // Check if the date is valid
+    if (isNaN(birthDate.getTime())) {
+      // console.warn('Invalid date format:', dateOfBirth);
+      return 0;
+    }
+    
+    let age = today.getFullYear() - birthDate.getFullYear();
+    const monthDiff = today.getMonth() - birthDate.getMonth();
+    if (monthDiff < 0 || (monthDiff === 0 && today.getDate() < birthDate.getDate())) {
+      age--;
+    }
+    return age;
+  } catch (error) {
+    // console.error('Error calculating age for date:', dateOfBirth, error);
+    return 0;
   }
-  return age;
 };
 
 // User interface
@@ -103,6 +124,7 @@ export interface Profile {
   hobbies?: string;
   verified: boolean;
   kidsPreference: string;
+  envaranId?: string;
   createdAt: Date;
   updatedAt: Date;
 }
@@ -110,19 +132,19 @@ export interface Profile {
 // Authentication functions
 export const registerWithEmail = async (email: string, password: string, userData: Partial<User>) => {
   try {
-    console.log('Starting registration process...', { email, userData });
+    // console.log('Starting registration process...', { email, userData });
     
     const userCredential = await createUserWithEmailAndPassword(auth, email, password);
     const user = userCredential.user;
     
-    console.log('Firebase Auth user created:', user.uid);
+    // console.log('Firebase Auth user created:', user.uid);
 
     // Update Firebase Auth profile
     const displayName = userData.fullName || 
       (userData.firstName && userData.lastName ? `${userData.firstName} ${userData.lastName}` : '') || 
       (userData.firstName || userData.lastName || '');
     
-    console.log('Updating Firebase Auth profile with:', { displayName, photoURL: userData.profileImageUrl || null });
+    // console.log('Updating Firebase Auth profile with:', { displayName, photoURL: userData.profileImageUrl || null });
     
     try {
       await updateFirebaseProfile(user, {
@@ -130,11 +152,11 @@ export const registerWithEmail = async (email: string, password: string, userDat
         photoURL: userData.profileImageUrl || null
       });
     } catch (profileError) {
-      console.error('Error updating Firebase Auth profile:', profileError);
+      // console.error('Error updating Firebase Auth profile:', profileError);
       // Continue with registration even if profile update fails
     }
     
-    console.log('Firebase Auth profile updated');
+    // console.log('Firebase Auth profile updated');
 
     // Create user document in Firestore
     const userDoc = {
@@ -156,83 +178,38 @@ export const registerWithEmail = async (email: string, password: string, userDat
       updatedAt: new Date()
     };
 
-    console.log('Creating user document in Firestore:', userDoc);
+    // console.log('Creating user document in Firestore:', userDoc);
     
     try {
-      console.log('Attempting to create user document in Firestore...');
-      console.log('Database instance:', db);
-      console.log('User UID:', user.uid);
-      console.log('User document data:', userDoc);
+      // console.log('Attempting to create user document in Firestore...');
+      // console.log('Database instance:', db);
+      // console.log('User UID:', user.uid);
+      // console.log('User document data:', userDoc);
       
       await setDoc(doc(db, 'users', user.uid), userDoc);
-      console.log('✅ User document successfully created in Firestore');
+      // console.log('✅ User document successfully created in Firestore');
       
       // Verify the document was created
       const verifyUserDoc = await getDoc(doc(db, 'users', user.uid));
-      console.log('✅ User document verification:', verifyUserDoc.exists());
+      // console.log('✅ User document verification:', verifyUserDoc.exists());
       
     } catch (error: any) {
-      console.error('❌ Error creating user document:', error);
-      console.error('Error code:', error.code);
-      console.error('Error message:', error.message);
-      console.error('Full error object:', error);
+      // console.error('❌ Error creating user document:', error);
+      // console.error('Error code:', error.code);
+      // console.error('Error message:', error.message);
+      // console.error('Full error object:', error);
       
       // Don't throw error here, continue with profile creation
-      console.log('⚠️ Continuing with profile creation despite user document error...');
+      // console.log('⚠️ Continuing with profile creation despite user document error...');
     }
 
-    // Create initial profile document
-    try {
-      console.log('Creating initial profile document...');
-      const initialProfile = {
-        userId: user.uid,
-        age: userData.dateOfBirth ? calculateAge(userData.dateOfBirth) : 0,
-        gender: userData.gender || '',
-        location: '',
-        profession: '',
-        professionOther: '',
-        bio: '',
-        education: '',
-        educationOther: '',
-        educationSpecification: '',
-        educationSpecificationOther: '',
-        relationshipStatus: '',
-        religion: userData.religion || '',
-        caste: userData.caste || '',
-        subCaste: userData.subCaste || '',
-        motherTongue: '',
-        smoking: '',
-        drinking: '',
-        lifestyle: '',
-        hobbies: '',
-        verified: false,
-        kidsPreference: ''
-      };
-
-      console.log('Profile data to create:', initialProfile);
-      
-      await setDoc(doc(db, 'profiles', user.uid), {
-        id: user.uid,
-        ...initialProfile,
-        createdAt: new Date(),
-        updatedAt: new Date()
-      });
-      console.log('✅ Initial profile document created in Firestore');
-      
-      // Verify the document was created
-      const verifyDoc = await getDoc(doc(db, 'profiles', user.uid));
-      console.log('✅ Profile document verification:', verifyDoc.exists());
-      
-    } catch (error: any) {
-      console.error('❌ Error creating profile document:', error);
-      console.error('Error code:', error.code);
-      console.error('Error message:', error.message);
-      // Don't throw error here, as user creation was successful
-    }
+    // Profile creation is now handled by the registration form
+    // No need to create separate profile document here
+    // console.log('✅ User document created successfully. Profile will be created via registration form.');
 
     return { user, userData: userDoc };
   } catch (error: any) {
-    console.error('Registration error:', error);
+    // console.error('Registration error:', error);
     
     // Handle specific Firebase Auth errors
     if (error.code === 'auth/email-already-in-use') {
@@ -254,7 +231,7 @@ export const loginWithEmail = async (email: string, password: string) => {
     const userCredential = await signInWithEmailAndPassword(auth, email, password);
     return userCredential.user;
   } catch (error: any) {
-    console.error('Login error:', error);
+    // console.error('Login error:', error);
     
     // Handle specific Firebase Auth errors
     if (error.code === 'auth/user-not-found') {
@@ -293,7 +270,7 @@ export const deleteAccount = async (password?: string) => {
       try {
         const credential = EmailAuthProvider.credential(user.email, password);
         await reauthenticateWithCredential(user, credential);
-        console.log('User re-authenticated successfully');
+        // console.log('User re-authenticated successfully');
       } catch (reauthError: any) {
         if (reauthError.code === 'auth/wrong-password') {
           throw new Error('Incorrect password. Please try again.');
@@ -306,26 +283,26 @@ export const deleteAccount = async (password?: string) => {
     // Delete user document from Firestore
     try {
       await deleteDoc(doc(db, 'users', user.uid));
-      console.log('User document deleted from Firestore');
+      // console.log('User document deleted from Firestore');
     } catch (error) {
-      console.error('Error deleting user document:', error);
+      // console.error('Error deleting user document:', error);
     }
 
     // Delete user profile from Firestore
     try {
       await deleteDoc(doc(db, 'profiles', user.uid));
-      console.log('User profile deleted from Firestore');
+      // console.log('User profile deleted from Firestore');
     } catch (error) {
-      console.error('Error deleting user profile:', error);
+      // console.error('Error deleting user profile:', error);
     }
 
     // Delete the Firebase Auth account
     await user.delete();
-    console.log('Firebase Auth account deleted');
+    // console.log('Firebase Auth account deleted');
     
     return true;
   } catch (error: any) {
-    console.error('Error deleting account:', error);
+    // console.error('Error deleting account:', error);
     
     // Handle specific Firebase errors
     if (error.code === 'auth/requires-recent-login') {
@@ -345,42 +322,42 @@ export const onAuthStateChange = (callback: (user: FirebaseUser | null) => void)
 // Test function to verify Firebase connectivity
 export const testFirebaseConnection = async () => {
   try {
-    console.log('Testing Firebase connection...');
+    // console.log('Testing Firebase connection...');
     
     // Test Firebase Auth
-    console.log('Firebase Auth instance:', auth);
-    console.log('Firestore instance:', db);
+    // console.log('Firebase Auth instance:', auth);
+    // console.log('Firestore instance:', db);
     
     // Test reading from users collection
     try {
       const testUserDoc = await getDoc(doc(db, 'users', 'test-user-1'));
-      console.log('✅ Users collection read test:', testUserDoc.exists());
+      // console.log('✅ Users collection read test:', testUserDoc.exists());
       if (testUserDoc.exists()) {
-        console.log('✅ User data:', testUserDoc.data());
+        // console.log('✅ User data:', testUserDoc.data());
       }
     } catch (error) {
-      console.error('❌ Users collection read test failed:', error);
+      // console.error('❌ Users collection read test failed:', error);
     }
     
     // Test reading from profiles collection
     try {
       const testProfileDoc = await getDoc(doc(db, 'profiles', 'test-user-1'));
-      console.log('✅ Profiles collection read test:', testProfileDoc.exists());
+      // console.log('✅ Profiles collection read test:', testProfileDoc.exists());
       if (testProfileDoc.exists()) {
         const profileData = testProfileDoc.data();
-        console.log('✅ Profile data:', profileData);
+        // console.log('✅ Profile data:', profileData);
         
         // Check specific fields
-        console.log('✅ Profile details:');
-        console.log('  - Name (from userId):', profileData.userId);
-        console.log('  - Age:', profileData.age);
-        console.log('  - Location:', profileData.location);
-        console.log('  - Profession:', profileData.profession);
-        console.log('  - Religion:', profileData.religion);
-        console.log('  - Bio:', profileData.bio);
+        // console.log('✅ Profile details:');
+        // console.log('  - Name (from userId):', profileData.userId);
+        // console.log('  - Age:', profileData.age);
+        // console.log('  - Location:', profileData.location);
+        // console.log('  - Profession:', profileData.profession);
+        // console.log('  - Religion:', profileData.religion);
+        // console.log('  - Bio:', profileData.bio);
       }
     } catch (error) {
-      console.error('❌ Profiles collection read test failed:', error);
+      // console.error('❌ Profiles collection read test failed:', error);
     }
     
     // Test writing to test collection
@@ -389,18 +366,18 @@ export const testFirebaseConnection = async () => {
         timestamp: new Date(),
         message: 'Connection test successful'
       });
-      console.log('✅ Write test successful');
+      // console.log('✅ Write test successful');
       
       // Clean up test document
       await deleteDoc(doc(db, 'test', 'connection'));
-      console.log('✅ Test document cleaned up');
+      // console.log('✅ Test document cleaned up');
     } catch (error) {
-      console.error('❌ Write test failed:', error);
+      // console.error('❌ Write test failed:', error);
     }
     
     return true;
   } catch (error) {
-    console.error('Firebase connection test failed:', error);
+    // console.error('Firebase connection test failed:', error);
     return false;
   }
 };
@@ -408,12 +385,12 @@ export const testFirebaseConnection = async () => {
 // Function to create missing documents for existing Firebase Auth users
 export const createMissingDocuments = async (firebaseUser: FirebaseUser) => {
   try {
-    console.log('🔧 Creating missing documents for user:', firebaseUser.uid);
+    // console.log('🔧 Creating missing documents for user:', firebaseUser.uid);
     
     // Check if user document exists
     const userDoc = await getDoc(doc(db, 'users', firebaseUser.uid));
     if (!userDoc.exists()) {
-      console.log('📝 Creating missing user document...');
+      // console.log('📝 Creating missing user document...');
       const userData = {
         id: firebaseUser.uid,
         email: firebaseUser.email || '',
@@ -432,15 +409,15 @@ export const createMissingDocuments = async (firebaseUser: FirebaseUser) => {
       };
       
       await setDoc(doc(db, 'users', firebaseUser.uid), userData);
-      console.log('✅ User document created successfully');
+      // console.log('✅ User document created successfully');
     } else {
-      console.log('✅ User document already exists');
+      // console.log('✅ User document already exists');
     }
     
     // Check if profile document exists
     const profileDoc = await getDoc(doc(db, 'profiles', firebaseUser.uid));
     if (!profileDoc.exists()) {
-      console.log('📝 Creating missing profile document...');
+      // console.log('📝 Creating missing profile document...');
       const profileData = {
         id: firebaseUser.uid,
         userId: firebaseUser.uid,
@@ -470,14 +447,14 @@ export const createMissingDocuments = async (firebaseUser: FirebaseUser) => {
       };
       
       await setDoc(doc(db, 'profiles', firebaseUser.uid), profileData);
-      console.log('✅ Profile document created successfully');
+      // console.log('✅ Profile document created successfully');
     } else {
-      console.log('✅ Profile document already exists');
+      // console.log('✅ Profile document already exists');
     }
     
     return true;
   } catch (error: any) {
-    console.error('❌ Error creating missing documents:', error);
+    // console.error('❌ Error creating missing documents:', error);
     throw new Error(error.message);
   }
 };
@@ -485,19 +462,19 @@ export const createMissingDocuments = async (firebaseUser: FirebaseUser) => {
 // User management functions
 export const getUserById = async (userId: string): Promise<User | null> => {
   try {
-    console.log('getUserById called with userId:', userId);
+    // console.log('getUserById called with userId:', userId);
     const userDoc = await getDoc(doc(db, 'users', userId));
-    console.log('User document exists:', userDoc.exists());
+    // console.log('User document exists:', userDoc.exists());
     if (userDoc.exists()) {
       const userData = { id: userDoc.id, ...userDoc.data() } as User;
-      console.log('User data retrieved:', userData);
+      // console.log('User data retrieved:', userData);
       return userData;
     }
-    console.log('User document does not exist for userId:', userId);
+    // console.log('User document does not exist for userId:', userId);
     return null;
   } catch (error: any) {
-    console.error('Error in getUserById:', error);
-    console.error('Error details:', error.code, error.message);
+    // console.error('Error in getUserById:', error);
+    // console.error('Error details:', error.code, error.message);
     throw new Error(error.message);
   }
 };
@@ -534,19 +511,19 @@ export const createProfile = async (profileData: Omit<Profile, 'id' | 'createdAt
 
 export const getProfile = async (userId: string): Promise<Profile | null> => {
   try {
-    console.log('getProfile called with userId:', userId);
+    // console.log('getProfile called with userId:', userId);
     const profileDoc = await getDoc(doc(db, 'profiles', userId));
-    console.log('Profile document exists:', profileDoc.exists());
+    // console.log('Profile document exists:', profileDoc.exists());
     if (profileDoc.exists()) {
       const profileData = { id: profileDoc.id, ...profileDoc.data() } as Profile;
-      console.log('Profile data retrieved:', profileData);
+      // console.log('Profile data retrieved:', profileData);
       return profileData;
     }
-    console.log('Profile document does not exist for userId:', userId);
+    // console.log('Profile document does not exist for userId:', userId);
     return null;
   } catch (error: any) {
-    console.error('Error in getProfile:', error);
-    console.error('Error details:', error.code, error.message);
+    // console.error('Error in getProfile:', error);
+    // console.error('Error details:', error.code, error.message);
     throw new Error(error.message);
   }
 };
@@ -554,7 +531,7 @@ export const getProfile = async (userId: string): Promise<Profile | null> => {
 // Get registration data by user ID
 export const getRegistrationByUserId = async (userId: string): Promise<any | null> => {
   try {
-    console.log('getRegistrationByUserId called with userId:', userId);
+    // console.log('getRegistrationByUserId called with userId:', userId);
     
     // First try a simple query without ordering to avoid index issues
     const registrationsQuery = query(
@@ -564,7 +541,7 @@ export const getRegistrationByUserId = async (userId: string): Promise<any | nul
     );
     
     const querySnapshot = await getDocs(registrationsQuery);
-    console.log('Registration documents found:', querySnapshot.size);
+    // console.log('Registration documents found:', querySnapshot.size);
     
     if (!querySnapshot.empty) {
       // If we found documents, get the most recent one
@@ -582,19 +559,19 @@ export const getRegistrationByUserId = async (userId: string): Promise<any | nul
       });
       
       const registrationData = { id: latestDoc.id, ...latestDoc.data() };
-      console.log('Registration data retrieved:', registrationData);
+      // console.log('Registration data retrieved:', registrationData);
       return registrationData;
     }
     
-    console.log('No registration document found for userId:', userId);
+    // console.log('No registration document found for userId:', userId);
     return null;
   } catch (error: any) {
-    console.error('Error in getRegistrationByUserId:', error);
-    console.error('Error details:', error.code, error.message);
+    // console.error('Error in getRegistrationByUserId:', error);
+    // console.error('Error details:', error.code, error.message);
     
     // If there's an index error, try a simpler approach
     if (error.code === 'failed-precondition') {
-      console.log('Index error detected, trying alternative approach...');
+      // console.log('Index error detected, trying alternative approach...');
       try {
         // Try to get all registrations and filter client-side
         const allRegistrationsQuery = query(
@@ -613,11 +590,11 @@ export const getRegistrationByUserId = async (userId: string): Promise<any | nul
         
         if (userRegistrations.length > 0) {
           const registrationData = { id: userRegistrations[0].id, ...userRegistrations[0].data() };
-          console.log('Registration data retrieved (alternative method):', registrationData);
+          // console.log('Registration data retrieved (alternative method):', registrationData);
           return registrationData;
         }
       } catch (fallbackError) {
-        console.error('Fallback method also failed:', fallbackError);
+        // console.error('Fallback method also failed:', fallbackError);
       }
     }
     
@@ -673,7 +650,7 @@ export const getProfiles = async (
   lastDoc?: QueryDocumentSnapshot<DocumentData>
 ): Promise<{ profiles: (Profile & { user: User })[], lastDoc: QueryDocumentSnapshot<DocumentData> | null }> => {
   try {
-    console.log('getProfiles called with excludeUserId:', excludeUserId);
+    // console.log('getProfiles called with excludeUserId:', excludeUserId);
     
     let q = query(
       collection(db, 'profiles'),
@@ -686,40 +663,40 @@ export const getProfiles = async (
     }
 
     const querySnapshot = await getDocs(q);
-    console.log('Query snapshot size:', querySnapshot.docs.length);
+    // console.log('Query snapshot size:', querySnapshot.docs.length);
     
     const profiles: (Profile & { user: User })[] = [];
 
     for (const doc of querySnapshot.docs) {
       if (excludeUserId && doc.id === excludeUserId) {
-        console.log('Skipping excluded user:', doc.id);
+        // console.log('Skipping excluded user:', doc.id);
         continue;
       }
       
       const profileData = { id: doc.id, ...doc.data() } as Profile;
-      console.log('Processing profile:', doc.id, 'userId:', profileData.userId);
+      // console.log('Processing profile:', doc.id, 'userId:', profileData.userId);
       
       try {
         const userData = await getUserById(profileData.userId);
         
         if (userData) {
           profiles.push({ ...profileData, user: userData });
-          console.log('Successfully added profile for user:', profileData.userId);
+          // console.log('Successfully added profile for user:', profileData.userId);
         } else {
-          console.log('No user data found for profile:', profileData.userId);
+          // console.log('No user data found for profile:', profileData.userId);
         }
       } catch (error: any) {
-        console.error('Error fetching user data for profile:', profileData.userId, error);
+        // console.error('Error fetching user data for profile:', profileData.userId, error);
         // Continue with other profiles even if one fails
       }
     }
 
     const lastVisible = querySnapshot.docs[querySnapshot.docs.length - 1] || null;
-    console.log('Final profiles count:', profiles.length);
+    // console.log('Final profiles count:', profiles.length);
 
     return { profiles, lastDoc: lastVisible };
   } catch (error: any) {
-    console.error('Error in getProfiles:', error);
+    // console.error('Error in getProfiles:', error);
     throw new Error(error.message);
   }
 };
@@ -731,7 +708,7 @@ export const getProfilesFromRegistrations = async (
   lastDoc?: QueryDocumentSnapshot<DocumentData>
 ): Promise<{ profiles: any[], lastDoc: QueryDocumentSnapshot<DocumentData> | null }> => {
   try {
-    console.log('getProfilesFromRegistrations called with excludeUserId:', excludeUserId);
+    // console.log('getProfilesFromRegistrations called with excludeUserId:', excludeUserId);
     
     let q = query(
       collection(db, 'registrations'),
@@ -745,18 +722,18 @@ export const getProfilesFromRegistrations = async (
     }
 
     const querySnapshot = await getDocs(q);
-    console.log('Registrations query snapshot size:', querySnapshot.docs.length);
+    // console.log('Registrations query snapshot size:', querySnapshot.docs.length);
     
     const profiles: any[] = [];
 
     for (const doc of querySnapshot.docs) {
       if (excludeUserId && doc.data().userId === excludeUserId) {
-        console.log('Skipping excluded user:', doc.data().userId);
+        // console.log('Skipping excluded user:', doc.data().userId);
         continue;
       }
       
       const registrationData = { id: doc.id, ...doc.data() } as any;
-      console.log('Processing registration:', doc.id, 'userId:', registrationData.userId);
+      // console.log('Processing registration:', doc.id, 'userId:', registrationData.userId);
       
       // Create a profile object from registration data
       const profile = {
@@ -783,6 +760,7 @@ export const getProfilesFromRegistrations = async (
         hobbies: '',
         verified: true, // All registration profiles are considered verified
         kidsPreference: '',
+        envaranId: registrationData.envaranId || '', // Add envaranId from registration data
         createdAt: registrationData.submittedAt || new Date(),
         updatedAt: registrationData.submittedAt || new Date(),
         // Add registration data for detailed view
@@ -796,7 +774,7 @@ export const getProfilesFromRegistrations = async (
         firstName: registrationData.name ? registrationData.name.split(' ')[0] : '',
         lastName: registrationData.name ? registrationData.name.split(' ').slice(1).join(' ') : '',
         fullName: registrationData.name || '',
-        profileImageUrl: '', // Not available in registrations
+        profileImageUrl: registrationData.profileImageUrl || '', // Use profileImageUrl from registration data
         gender: registrationData.gender || '',
         dateOfBirth: registrationData.dateOfBirth || '',
         religion: registrationData.religion || '',
@@ -808,20 +786,20 @@ export const getProfilesFromRegistrations = async (
       };
       
       profiles.push({ ...profile, user });
-      console.log('Successfully added profile from registration for user:', registrationData.userId);
+      // console.log('Successfully added profile from registration for user:', registrationData.userId);
     }
 
     const lastVisible = querySnapshot.docs[querySnapshot.docs.length - 1] || null;
-    console.log('Final profiles count from registrations:', profiles.length);
+    // console.log('Final profiles count from registrations:', profiles.length);
 
     return { profiles, lastDoc: lastVisible };
   } catch (error: any) {
-    console.error('Error in getProfilesFromRegistrations:', error);
-    console.error('Error details:', error.code, error.message);
+    // console.error('Error in getProfilesFromRegistrations:', error);
+    // console.error('Error details:', error.code, error.message);
     
     // If there's an index error, try a simpler approach
     if (error.code === 'failed-precondition') {
-      console.log('Index error detected, trying alternative approach...');
+      // console.log('Index error detected, trying alternative approach...');
       try {
         // Try to get all registrations and filter client-side
         const allRegistrationsQuery = query(
@@ -846,7 +824,7 @@ export const getProfilesFromRegistrations = async (
 
         for (const doc of completedRegistrations) {
           const registrationData = { id: doc.id, ...doc.data() } as any;
-          console.log('Processing registration (fallback):', doc.id, 'userId:', registrationData.userId);
+          // console.log('Processing registration (fallback):', doc.id, 'userId:', registrationData.userId);
           
           // Create a profile object from registration data
           const profile = {
@@ -873,6 +851,7 @@ export const getProfilesFromRegistrations = async (
             hobbies: '',
             verified: true, // All registration profiles are considered verified
             kidsPreference: '',
+            envaranId: registrationData.envaranId || '', // Add envaranId from registration data
             createdAt: registrationData.submittedAt || new Date(),
             updatedAt: registrationData.submittedAt || new Date(),
             // Add registration data for detailed view
@@ -886,7 +865,7 @@ export const getProfilesFromRegistrations = async (
             firstName: registrationData.name ? registrationData.name.split(' ')[0] : '',
             lastName: registrationData.name ? registrationData.name.split(' ').slice(1).join(' ') : '',
             fullName: registrationData.name || '',
-            profileImageUrl: '', // Not available in registrations
+            profileImageUrl: registrationData.profileImageUrl || '', // Use profileImageUrl from registration data
             gender: registrationData.gender || '',
             dateOfBirth: registrationData.dateOfBirth || '',
             religion: registrationData.religion || '',
@@ -898,13 +877,13 @@ export const getProfilesFromRegistrations = async (
           };
           
           profiles.push({ ...profile, user });
-          console.log('Successfully added profile from registration (fallback) for user:', registrationData.userId);
+          // console.log('Successfully added profile from registration (fallback) for user:', registrationData.userId);
         }
 
-        console.log('Final profiles count from registrations (fallback):', profiles.length);
+        // console.log('Final profiles count from registrations (fallback):', profiles.length);
         return { profiles, lastDoc: null };
       } catch (fallbackError) {
-        console.error('Fallback method also failed:', fallbackError);
+        // console.error('Fallback method also failed:', fallbackError);
         throw new Error('Failed to fetch profiles. Please try again later.');
       }
     }

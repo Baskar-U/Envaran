@@ -39,8 +39,8 @@ interface Payment {
   plan: 'monthly' | 'yearly';
   amount: number;
   transactionId: string;
-  screenshotUrl: string; // Filename only
-  screenshotBase64?: string; // Base64 data for admin access
+  screenshotUrl: string; // Filename for reference
+  screenshotBase64?: string; // Compressed base64 data for admin access
   status: 'pending' | 'approved' | 'denied';
   submittedAt: Date;
   reviewedAt?: Date;
@@ -73,7 +73,7 @@ export default function Payments() {
 
   const fetchPayments = async () => {
     try {
-      console.log('🔍 Fetching payments...');
+      // console.log('🔍 Fetching payments...');
       setLoading(true);
       
       const paymentsQuery = query(
@@ -81,23 +81,23 @@ export default function Payments() {
         orderBy('submittedAt', 'desc')
       );
       
-      console.log('📥 Executing query...');
+      // console.log('📥 Executing query...');
       const snapshot = await getDocs(paymentsQuery);
       
-      console.log('📊 Query results:', {
-        size: snapshot.size,
-        empty: snapshot.empty,
-        docs: snapshot.docs.length
-      });
+      // console.log('📊 Query results:', {
+      //   size: snapshot.size,
+      //   empty: snapshot.empty,
+      //   docs: snapshot.docs.length
+      // });
       
       const paymentsData: Payment[] = snapshot.docs.map(doc => {
         const data = doc.data();
-        console.log('📄 Document data:', {
-          id: doc.id,
-          userId: data.userId,
-          userEmail: data.userEmail,
-          status: data.status
-        });
+        // console.log('📄 Document data:', {
+        //   id: doc.id,
+        //   userId: data.userId,
+        //   userEmail: data.userEmail,
+        //   status: data.status
+        // });
         
         return {
           id: doc.id,
@@ -107,16 +107,16 @@ export default function Payments() {
         } as Payment;
       });
       
-      console.log('✅ Processed payments:', paymentsData.length);
+      // console.log('✅ Processed payments:', paymentsData.length);
       setPayments(paymentsData);
       
     } catch (error) {
-      console.error('❌ Error fetching payments:', error);
-      console.error('Error details:', {
-        message: error.message,
-        code: error.code,
-        stack: error.stack
-      });
+      // console.error('❌ Error fetching payments:', error);
+      // console.error('Error details:', {
+      //   message: error.message,
+      //   code: error.code,
+      //   stack: error.stack
+      // });
       
       toast({
         title: "Error",
@@ -133,10 +133,10 @@ export default function Payments() {
     
     setProcessingId(payment.id);
     try {
-      console.log('🔄 Approving payment for:', payment.userName);
-      console.log('📧 User email:', payment.userEmail);
-      console.log('🆔 User ID:', payment.userId);
-      console.log('📋 Plan:', payment.plan);
+      // console.log('🔄 Approving payment for:', payment.userName);
+      // console.log('📧 User email:', payment.userEmail);
+      // console.log('🆔 User ID:', payment.userId);
+      // console.log('📋 Plan:', payment.plan);
       
       // Update payment status
       const paymentRef = doc(db, 'payments', payment.id);
@@ -145,7 +145,7 @@ export default function Payments() {
         reviewedAt: new Date(),
         reviewedBy: firebaseUser.email
       });
-      console.log('✅ Payment status updated to approved');
+      // console.log('✅ Payment status updated to approved');
 
       // Find user's registration document in registrations collection using userId
       const registrationsCollection = collection(db, 'registrations');
@@ -160,16 +160,16 @@ export default function Payments() {
           plan: 'premium' // Change plan from 'free' to 'premium'
         });
         
-        console.log('✅ User registration updated to premium using userId:', payment.userId);
-        console.log('📄 Registration document ID:', registrationDoc.id);
+        // console.log('✅ User registration updated to premium using userId:', payment.userId);
+        // console.log('📄 Registration document ID:', registrationDoc.id);
       } else {
-        console.log('⚠️ No registration found for userId:', payment.userId);
+        // console.log('⚠️ No registration found for userId:', payment.userId);
         throw new Error('User registration not found');
       }
       
-      console.log('✅ User upgraded to premium successfully!');
-      console.log('📋 Updated field:');
-      console.log('• plan: premium');
+      // console.log('✅ User upgraded to premium successfully!');
+      // console.log('📋 Updated field:');
+      // console.log('• plan: premium');
 
       toast({
         title: "Payment Approved",
@@ -179,12 +179,12 @@ export default function Payments() {
       // Refresh payments list
       fetchPayments();
     } catch (error) {
-      console.error('❌ Error approving payment:', error);
-      console.error('Error details:', {
-        message: error.message,
-        code: error.code,
-        stack: error.stack
-      });
+      // console.error('❌ Error approving payment:', error);
+      // console.error('Error details:', {
+      //   message: error.message,
+      //   code: error.code,
+      //   stack: error.stack
+      // });
       
       toast({
         title: "Approval Failed",
@@ -215,7 +215,7 @@ export default function Payments() {
 
       fetchPayments();
     } catch (error) {
-      console.error('Error denying payment:', error);
+      // console.error('Error denying payment:', error);
       toast({
         title: "Denial Failed",
         description: "There was an error denying the payment",
@@ -329,9 +329,9 @@ export default function Payments() {
               </Button>
               <Button 
                 onClick={() => {
-                  console.log('🔍 Current payments state:', payments);
-                  console.log('🔍 Current loading state:', loading);
-                  console.log('🔍 Current admin state:', { isAdmin, adminLoading, needsPassword });
+                  // console.log('🔍 Current payments state:', payments);
+                  // console.log('🔍 Current loading state:', loading);
+                  // console.log('🔍 Current admin state:', { isAdmin, adminLoading, needsPassword });
                 }}
                 variant="outline"
                 className="bg-white/20 hover:bg-white/30 text-white border-white/30"

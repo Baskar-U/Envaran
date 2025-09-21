@@ -3,7 +3,6 @@ import { Route, Switch } from "wouter";
 import { AuthProvider } from "@/hooks/useAuth";
 import ProtectedRoute from "@/components/ProtectedRoute";
 import PublicOnlyRoute from "@/components/PublicOnlyRoute";
-import Home from "@/pages/Home";
 import Landing from "@/pages/Landing";
 import Profiles from "@/pages/Profiles";
 import Profile from "@/pages/Profile";
@@ -18,6 +17,9 @@ import Premium from "@/pages/Premium";
 import Payments from "@/pages/Payments";
 import ImageTest from "@/pages/ImageTest";
 import AboutUs from "@/pages/AboutUs";
+import PrivacyPolicy from "@/pages/PrivacyPolicy";
+import TermsAndConditions from "@/pages/TermsAndConditions";
+import ContactUs from "@/pages/ContactUs";
 import NotFound from "@/pages/not-found";
 import SetupTest from "@/components/SetupTest";
 
@@ -28,11 +30,9 @@ export default function App() {
     <QueryClientProvider client={queryClient}>
       <AuthProvider>
         <Switch>
-          {/* Public routes - only accessible to non-authenticated users */}
+          {/* Home route - accessible to all users */}
           <Route path="/">
-            <PublicOnlyRoute>
-              <Landing />
-            </PublicOnlyRoute>
+            <Landing />
           </Route>
           <Route path="/login">
             <PublicOnlyRoute>
@@ -47,6 +47,15 @@ export default function App() {
           <Route path="/about">
             <AboutUs />
           </Route>
+          <Route path="/privacy-policy">
+            <PrivacyPolicy />
+          </Route>
+          <Route path="/terms-and-conditions">
+            <TermsAndConditions />
+          </Route>
+          <Route path="/contact">
+            <ContactUs />
+          </Route>
 
           {/* Setup test route - for development only */}
           <Route path="/setup-test">
@@ -56,40 +65,28 @@ export default function App() {
             <ImageTest />
           </Route>
 
-          {/* Protected routes - only accessible to authenticated users */}
-          <Route path="/home">
-            <ProtectedRoute>
-              <Home />
-            </ProtectedRoute>
-          </Route>
           <Route path="/profiles">
-            <ProtectedRoute>
-              <Profiles />
-            </ProtectedRoute>
+            <Profiles />
           </Route>
+          <Route path="/matches">
+            <Matches />
+          </Route>
+          <Route path="/events">
+            <Events />
+          </Route>
+
+          {/* Protected routes - only accessible to authenticated users */}
           <Route path="/profile">
             <ProtectedRoute>
               <Profile />
             </ProtectedRoute>
           </Route>
           <Route path="/view-profile/:userId">
-            <ProtectedRoute>
-              <ViewProfile />
-            </ProtectedRoute>
+            <ViewProfile />
           </Route>
           <Route path="/settings">
             <ProtectedRoute>
               <Settings />
-            </ProtectedRoute>
-          </Route>
-          <Route path="/matches">
-            <ProtectedRoute>
-              <Matches />
-            </ProtectedRoute>
-          </Route>
-          <Route path="/events">
-            <ProtectedRoute>
-              <Events />
             </ProtectedRoute>
           </Route>
           <Route path="/premium">

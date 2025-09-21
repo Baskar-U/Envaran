@@ -13,31 +13,56 @@ import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, Di
 import { addDoc, collection, updateDoc, doc } from "firebase/firestore";
 import { db } from "@/lib/firebase";
 
+// Function to compress image before converting to base64
+const compressImage = (file: File, maxWidth: number = 800, quality: number = 0.7): Promise<string> => {
+  return new Promise((resolve) => {
+    const canvas = document.createElement('canvas');
+    const ctx = canvas.getContext('2d');
+    const img = new Image();
+    
+    img.onload = () => {
+      // Calculate new dimensions
+      let { width, height } = img;
+      if (width > maxWidth) {
+        height = (height * maxWidth) / width;
+        width = maxWidth;
+      }
+      
+      canvas.width = width;
+      canvas.height = height;
+      
+      // Draw and compress
+      ctx?.drawImage(img, 0, 0, width, height);
+      const compressedDataUrl = canvas.toDataURL('image/jpeg', quality);
+      resolve(compressedDataUrl);
+    };
+    
+    img.src = URL.createObjectURL(file);
+  });
+};
+
 export default function Premium() {
   const { firebaseUser } = useAuth();
   const { toast } = useToast();
-  const [selectedPlan, setSelectedPlan] = useState<'monthly' | 'yearly'>('monthly');
+  const [selectedPlan, setSelectedPlan] = useState<'1month'>('1month');
   const [isPaymentOpen, setIsPaymentOpen] = useState(false);
   const [isProcessing, setIsProcessing] = useState(false);
   const [transactionId, setTransactionId] = useState('');
   const [screenshot, setScreenshot] = useState<File | null>(null);
   const [screenshotPreview, setScreenshotPreview] = useState<string | null>(null);
   const [showSuccessDialog, setShowSuccessDialog] = useState(false);
+  const [errors, setErrors] = useState<{transactionId?: string; screenshot?: string}>({});
   const fileInputRef = useRef<HTMLInputElement>(null);
 
-  const plans = {
-    monthly: {
-      price: 299,
-      period: 'month',
-      savings: null,
-      popular: false
-    },
-    yearly: {
-      price: 2999,
-      period: 'year',
-      savings: 'Save ₹589',
-      popular: true
-    }
+  const plan = {
+    id: '1month',
+    name: '1 Month Premium',
+    price: 299,
+    originalPrice: 399,
+    discount: '25% OFF',
+    period: '1 month',
+    qrCode: '/3month.jpg',
+    popular: true
   };
 
   const features = [
@@ -87,9 +112,57 @@ export default function Premium() {
     setIsPaymentOpen(true);
   };
 
+  const validateForm = () => {
+    const newErrors: {transactionId?: string; screenshot?: string} = {};
+    
+    // Validate transaction ID
+    if (!transactionId.trim()) {
+      newErrors.transactionId = 'Transaction ID is required';
+    } else if (transactionId.trim().length < 5) {
+      newErrors.transactionId = 'Transaction ID must be at least 5 characters';
+    }
+    
+    // Validate screenshot
+    if (!screenshot) {
+      newErrors.screenshot = 'Payment screenshot is required';
+    } else {
+      // Validate file type
+      const allowedTypes = ['image/png', 'image/jpeg', 'image/jpg'];
+      if (!allowedTypes.includes(screenshot.type)) {
+        newErrors.screenshot = 'Only PNG, JPG, and JPEG files are allowed';
+      }
+      
+      // Validate file size (5MB = 5 * 1024 * 1024 bytes)
+      const maxSize = 5 * 1024 * 1024;
+      if (screenshot.size > maxSize) {
+        newErrors.screenshot = 'File size must be less than 5MB';
+      }
+    }
+    
+    setErrors(newErrors);
+    return Object.keys(newErrors).length === 0;
+  };
+
   const handleScreenshotChange = (event: React.ChangeEvent<HTMLInputElement>) => {
     const file = event.target.files?.[0];
     if (file) {
+      // Clear previous errors
+      setErrors(prev => ({ ...prev, screenshot: undefined }));
+      
+      // Validate file type
+      const allowedTypes = ['image/png', 'image/jpeg', 'image/jpg'];
+      if (!allowedTypes.includes(file.type)) {
+        setErrors(prev => ({ ...prev, screenshot: 'Only PNG, JPG, and JPEG files are allowed' }));
+        return;
+      }
+      
+      // Validate file size
+      const maxSize = 5 * 1024 * 1024;
+      if (file.size > maxSize) {
+        setErrors(prev => ({ ...prev, screenshot: 'File size must be less than 5MB' }));
+        return;
+      }
+      
       setScreenshot(file);
       const reader = new FileReader();
       reader.onload = (e) => {
@@ -107,11 +180,21 @@ export default function Premium() {
     }
   };
 
-    const handleSubmitPayment = async () => {
-    if (!firebaseUser || !transactionId.trim() || !screenshot) {
+  const handleSubmitPayment = async () => {
+    if (!firebaseUser) {
       toast({
-        title: "Missing Information",
-        description: "Please provide transaction ID and screenshot",
+        title: "Authentication Required",
+        description: "Please log in to submit payment",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    // Validate form before submission
+    if (!validateForm()) {
+      toast({
+        title: "Validation Error",
+        description: "Please fix the errors below before submitting",
         variant: "destructive",
       });
       return;
@@ -119,26 +202,35 @@ export default function Premium() {
 
     setIsProcessing(true);
     try {
-      // Convert screenshot to base64
-      const reader = new FileReader();
-      const base64Promise = new Promise<string>((resolve) => {
-        reader.onload = () => {
-          resolve(reader.result as string);
-        };
-      });
-      reader.readAsDataURL(screenshot);
-      const screenshotBase64 = await base64Promise;
+      // Compress image to reduce size
+      const compressedBase64 = await compressImage(screenshot!, 800, 0.6);
+      
+      // Check if compressed image is still too large (Firestore limit is ~1MB)
+      const sizeInBytes = (compressedBase64.length * 3) / 4; // Approximate base64 to bytes
+      if (sizeInBytes > 900000) { // 900KB limit to be safe
+        toast({
+          title: "Image Too Large",
+          description: "Please use a smaller image or compress it further.",
+          variant: "destructive",
+        });
+        setIsProcessing(false);
+        return;
+      }
 
-      // Add payment record to Firestore with base64 screenshot
+      // Add payment record to Firestore with compressed base64 screenshot
       await addDoc(collection(db, 'payments'), {
         userId: firebaseUser.uid,
         userEmail: firebaseUser.email,
         userName: firebaseUser.displayName || 'Unknown',
         plan: selectedPlan,
-        amount: plans[selectedPlan].price,
+        planName: plan.name,
+        planDuration: plan.period,
+        amount: plan.price,
+        originalPrice: plan.originalPrice,
+        discount: plan.discount,
         transactionId: transactionId.trim(),
-        screenshotUrl: `${Date.now()}_${screenshot.name}`, // Store filename only
-        screenshotBase64: screenshotBase64, // Store base64 data for admin access
+        screenshotUrl: `${Date.now()}_${screenshot!.name}`, // Store filename for reference
+        screenshotBase64: compressedBase64, // Store compressed base64 data
         status: 'pending',
         submittedAt: new Date(),
         reviewedAt: null,
@@ -153,9 +245,15 @@ export default function Premium() {
       setTransactionId('');
       setScreenshot(null);
       setScreenshotPreview(null);
+      setErrors({});
+
+      toast({
+        title: "Payment Submitted Successfully!",
+        description: "Your payment has been submitted for review. You'll be notified once approved.",
+      });
 
     } catch (error) {
-      console.error('Error submitting payment:', error);
+      // console.error('Error submitting payment:', error);
       toast({
         title: "Submission Failed",
         description: "There was an error submitting your payment. Please try again.",
@@ -171,272 +269,338 @@ export default function Premium() {
       <Navigation />
       
       {/* Header Section */}
-      <section className="pt-20 pb-16 bg-gradient-to-br from-orange-500 to-red-600 text-white">
+      <section className="pt-16 sm:pt-20 pb-12 sm:pb-16 bg-gradient-to-br from-orange-500 to-red-600 text-white">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 text-center">
-          <div className="flex justify-center mb-6">
-            <div className="w-16 h-16 bg-white/20 rounded-full flex items-center justify-center">
-              <Crown className="h-8 w-8 text-white" />
+          <div className="flex justify-center mb-4 sm:mb-6">
+            <div className="w-12 h-12 sm:w-16 sm:h-16 bg-white/20 rounded-full flex items-center justify-center">
+              <Crown className="h-6 w-6 sm:h-8 sm:w-8 text-white" />
             </div>
           </div>
-          <h1 className="text-4xl lg:text-6xl font-bold mb-6">
+          <h1 className="text-3xl sm:text-4xl lg:text-6xl font-bold mb-4 sm:mb-6 leading-tight">
             Upgrade to <span className="text-yellow-300">Premium</span>
           </h1>
-          <p className="text-xl text-orange-100 max-w-3xl mx-auto">
+          <p className="text-base sm:text-lg lg:text-xl text-orange-100 max-w-3xl mx-auto leading-relaxed">
             Unlock unlimited access to contact details, advanced matching, and exclusive features
           </p>
         </div>
       </section>
 
       {/* Pricing Section */}
-      <section className="py-16">
+      <section className="py-12 sm:py-16">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           {/* Plan Selection */}
-          <div className="flex justify-center mb-12">
-            <div className="bg-white rounded-lg p-1 shadow-lg">
-              <div className="flex">
-                <button
-                  onClick={() => setSelectedPlan('monthly')}
-                  className={`px-6 py-3 rounded-md font-medium transition-all ${
-                    selectedPlan === 'monthly'
-                      ? 'bg-orange-500 text-white shadow-md'
-                      : 'text-gray-600 hover:text-orange-500'
-                  }`}
-                >
-                  Monthly
-                </button>
-                <button
-                  onClick={() => setSelectedPlan('yearly')}
-                  className={`px-6 py-3 rounded-md font-medium transition-all relative ${
-                    selectedPlan === 'yearly'
-                      ? 'bg-orange-500 text-white shadow-md'
-                      : 'text-gray-600 hover:text-orange-500'
-                  }`}
-                >
-                  Yearly
-                  {plans.yearly.savings && (
-                    <Badge className="absolute -top-2 -right-2 text-xs bg-green-500">
-                      {plans.yearly.savings}
+          <div className="flex justify-center">
+            <div className="max-w-md w-full">
+              <Card 
+                className="relative cursor-pointer transition-all duration-200 hover:shadow-lg ring-2 ring-orange-500 shadow-xl border-orange-300"
+                onClick={() => setSelectedPlan('1month')}
+              >
+                {plan.popular && (
+                  <div className="absolute -top-3 left-1/2 transform -translate-x-1/2">
+                    <Badge className="bg-gradient-to-r from-orange-500 to-red-500 text-white px-3 py-1">
+                      <Star className="w-3 h-3 mr-1" />
+                      Premium Package
                     </Badge>
-                  )}
-                </button>
-              </div>
+                  </div>
+                )}
+                
+                <CardHeader className="text-center">
+                  <CardTitle className="text-xl">{plan.name}</CardTitle>
+                  <div className="mt-2">
+                    <span className="text-3xl font-bold text-gray-900">₹{plan.price}</span>
+                    <span className="text-lg text-gray-500 line-through ml-2">₹{plan.originalPrice}</span>
+                  </div>
+                  <Badge variant="secondary" className="mt-2">
+                    {plan.discount}
+                  </Badge>
+                </CardHeader>
+                
+                <CardContent>
+                  <div className="space-y-3">
+                    {/* All Premium Features */}
+                    <div className="flex items-start space-x-3">
+                      <div className="flex-shrink-0 w-5 h-5 bg-orange-100 rounded-full flex items-center justify-center">
+                        <Check className="h-3 w-3 text-orange-600" />
+                      </div>
+                      <div>
+                        <h4 className="text-sm font-medium text-gray-800">View Contact Details</h4>
+                      </div>
+                    </div>
+                    <div className="flex items-start space-x-3">
+                      <div className="flex-shrink-0 w-5 h-5 bg-orange-100 rounded-full flex items-center justify-center">
+                        <Check className="h-3 w-3 text-orange-600" />
+                      </div>
+                      <div>
+                        <h4 className="text-sm font-medium text-gray-800">Unlimited Messages</h4>
+                      </div>
+                    </div>
+                    <div className="flex items-start space-x-3">
+                      <div className="flex-shrink-0 w-5 h-5 bg-orange-100 rounded-full flex items-center justify-center">
+                        <Check className="h-3 w-3 text-orange-600" />
+                      </div>
+                      <div>
+                        <h4 className="text-sm font-medium text-gray-800">Advanced Search Filters</h4>
+                      </div>
+                    </div>
+                    <div className="flex items-start space-x-3">
+                      <div className="flex-shrink-0 w-5 h-5 bg-orange-100 rounded-full flex items-center justify-center">
+                        <Check className="h-3 w-3 text-orange-600" />
+                      </div>
+                      <div>
+                        <h4 className="text-sm font-medium text-gray-800">Profile Boost (3x Visibility)</h4>
+                      </div>
+                    </div>
+                    <div className="flex items-start space-x-3">
+                      <div className="flex-shrink-0 w-5 h-5 bg-orange-100 rounded-full flex items-center justify-center">
+                        <Check className="h-3 w-3 text-orange-600" />
+                      </div>
+                      <div>
+                        <h4 className="text-sm font-medium text-gray-800">View Raasi Charts</h4>
+                      </div>
+                    </div>
+                    <div className="flex items-start space-x-3">
+                      <div className="flex-shrink-0 w-5 h-5 bg-orange-100 rounded-full flex items-center justify-center">
+                        <Check className="h-3 w-3 text-orange-600" />
+                      </div>
+                      <div>
+                        <h4 className="text-sm font-medium text-gray-800">Advanced Matching</h4>
+                      </div>
+                    </div>
+                    <div className="flex items-start space-x-3">
+                      <div className="flex-shrink-0 w-5 h-5 bg-orange-100 rounded-full flex items-center justify-center">
+                        <Check className="h-3 w-3 text-orange-600" />
+                      </div>
+                      <div>
+                        <h4 className="text-sm font-medium text-gray-800">Verified Badge</h4>
+                      </div>
+                    </div>
+                    <div className="flex items-start space-x-3">
+                      <div className="flex-shrink-0 w-5 h-5 bg-orange-100 rounded-full flex items-center justify-center">
+                        <Check className="h-3 w-3 text-orange-600" />
+                      </div>
+                      <div>
+                        <h4 className="text-sm font-medium text-gray-800">Exclusive Events Access</h4>
+                      </div>
+                    </div>
+                    <div className="flex items-start space-x-3">
+                      <div className="flex-shrink-0 w-5 h-5 bg-orange-100 rounded-full flex items-center justify-center">
+                        <Check className="h-3 w-3 text-orange-600" />
+                      </div>
+                      <div>
+                        <h4 className="text-sm font-medium text-gray-800">Priority Support</h4>
+                      </div>
+                    </div>
+                    <div className="flex items-start space-x-3">
+                      <div className="flex-shrink-0 w-5 h-5 bg-orange-100 rounded-full flex items-center justify-center">
+                        <Check className="h-3 w-3 text-orange-600" />
+                      </div>
+                      <div>
+                        <h4 className="text-sm font-medium text-gray-800">Video Call Initiation</h4>
+                      </div>
+                    </div>
+                    <div className="flex items-start space-x-3">
+                      <div className="flex-shrink-0 w-5 h-5 bg-orange-100 rounded-full flex items-center justify-center">
+                        <Check className="h-3 w-3 text-orange-600" />
+                      </div>
+                      <div>
+                        <h4 className="text-sm font-medium text-gray-800">Early Access to New Features</h4>
+                      </div>
+                    </div>
+                  </div>
+                  
+                  <Button 
+                    className="w-full mt-6 bg-gradient-to-r from-orange-500 to-red-500 hover:from-orange-600 hover:to-red-600 text-white"
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      setSelectedPlan('1month');
+                      handleUpgrade();
+                    }}
+                  >
+                    <Crown className="w-4 h-4 mr-2" />
+                    Choose Plan
+                  </Button>
+                </CardContent>
+              </Card>
             </div>
           </div>
 
-          {/* Pricing Card */}
-          <div className="max-w-md mx-auto">
-            <Card className="relative border-2 border-orange-200 shadow-xl">
-              {plans[selectedPlan].popular && (
-                <div className="absolute -top-4 left-1/2 transform -translate-x-1/2">
-                  <Badge className="bg-gradient-to-r from-orange-500 to-red-500 text-white px-4 py-1">
-                    Most Popular
-                  </Badge>
-                </div>
-              )}
+          {/* Payment Dialog */}
+          <Dialog open={isPaymentOpen} onOpenChange={setIsPaymentOpen}>
+            <DialogContent className="max-w-4xl w-[90vw] max-h-[90vh] overflow-y-auto">
+              <DialogHeader>
+                <DialogTitle className="text-center text-xl">Complete Payment</DialogTitle>
+                <DialogDescription className="text-center">
+                  Scan the QR code and provide payment details
+                </DialogDescription>
+              </DialogHeader>
               
-              <CardHeader className="text-center pb-8">
-                <CardTitle className="text-3xl font-bold text-gray-800">
-                  ₹{plans[selectedPlan].price}
-                </CardTitle>
-                <CardDescription className="text-lg text-gray-600">
-                  per {plans[selectedPlan].period}
-                </CardDescription>
-                {plans[selectedPlan].savings && (
-                  <Badge className="w-fit mx-auto bg-green-100 text-green-800">
-                    {plans[selectedPlan].savings}
-                  </Badge>
-                )}
-              </CardHeader>
-
-              <CardContent className="space-y-6">
-                <div className="space-y-4">
-                  {features.map((feature, index) => (
-                    <div key={index} className="flex items-start space-x-3">
-                      <div className="flex-shrink-0 w-6 h-6 bg-orange-100 rounded-full flex items-center justify-center">
-                        <Check className="h-4 w-4 text-orange-600" />
-                      </div>
-                      <div>
-                        <h4 className="font-medium text-gray-800">{feature.title}</h4>
-                        <p className="text-sm text-gray-600">{feature.description}</p>
-                      </div>
+              <div className="grid grid-cols-1 lg:grid-cols-2 gap-8 mt-6">
+                {/* Left Side - QR Code */}
+                <div className="flex flex-col items-center">
+                  <div className="bg-white rounded-lg p-6 border-2 border-gray-200 shadow-lg max-w-sm">
+                    {/* QR Code Image */}
+                    <div className="w-64 h-64 bg-white border-2 border-gray-300 rounded-lg flex items-center justify-center overflow-hidden mx-auto">
+                      <img 
+                        src={plan.qrCode} 
+                        alt={`${plan.name} QR Code`} 
+                        className="w-full h-full object-contain"
+                        onError={(e) => {
+                          // console.error('Failed to load QR code image:', e);
+                          // Show a fallback message
+                          e.currentTarget.style.display = 'none';
+                          const parent = e.currentTarget.parentElement;
+                          if (parent) {
+                            parent.innerHTML = `
+                              <div class="text-center text-gray-500">
+                                <p class="text-sm">QR Code Image</p>
+                                <p class="text-xs">(${plan.qrCode} not found)</p>
+                                <p class="text-xs mt-2">Check console for details</p>
+                              </div>
+                            `;
+                          }
+                        }}
+                        onLoad={() => {
+                          // console.log('✅ QR code image loaded successfully');
+                        }}
+                        style={{ maxWidth: '100%', maxHeight: '100%' }}
+                        crossOrigin="anonymous"
+                      />
                     </div>
-                  ))}
+                    
+                    {/* QR code image contains all payment details */}
+                  </div>
+                  
+                  <p className="text-sm text-gray-600 mt-3 text-center">Scan to pay with any UPI app</p>
+                  
+                  {/* Payment Details */}
+                  <div className="mt-4 text-center space-y-1">
+                    <p className="text-sm text-gray-600">
+                      Amount: <span className="font-semibold">₹{plan.price}</span>
+                    </p>
+                    <p className="text-sm text-gray-600">
+                      Plan: <span className="font-semibold">{plan.name}</span>
+                    </p>
+                  </div>
                 </div>
 
-                <Dialog open={isPaymentOpen} onOpenChange={setIsPaymentOpen}>
-                  <DialogTrigger asChild>
-                    <Button 
-                      className="w-full bg-gradient-to-r from-orange-500 to-red-500 hover:from-orange-600 hover:to-red-600 text-white py-3 text-lg font-semibold"
-                      onClick={handleUpgrade}
-                    >
-                      <Crown className="mr-2 h-5 w-5" />
-                      Upgrade Now
-                    </Button>
-                  </DialogTrigger>
-                                     <DialogContent className="max-w-4xl w-[90vw] max-h-[90vh] overflow-y-auto">
-                     <DialogHeader>
-                       <DialogTitle className="text-center text-xl">Complete Payment</DialogTitle>
-                       <DialogDescription className="text-center">
-                         Scan the QR code and provide payment details
-                       </DialogDescription>
-                     </DialogHeader>
-                     
-                     <div className="grid grid-cols-1 lg:grid-cols-2 gap-8 mt-6">
-                                               {/* Left Side - QR Code */}
-                        <div className="flex flex-col items-center">
-                                                     <div className="bg-white rounded-lg p-6 border-2 border-gray-200 shadow-lg max-w-sm">
-                             {/* QR Code Image - Zoomed Out to Show Name */}
-                             <div className="w-64 h-64 bg-white border-2 border-gray-300 rounded-lg flex items-center justify-center overflow-hidden mx-auto">
-                               <img 
-                                 src="/payment.jpg" 
-                                 alt="UPI QR Code" 
-                                 className="w-full h-full object-contain"
-                                 onError={(e) => {
-                                   console.error('Failed to load QR code image:', e);
-                                   // Show a fallback message
-                                   e.currentTarget.style.display = 'none';
-                                   const parent = e.currentTarget.parentElement;
-                                   if (parent) {
-                                     parent.innerHTML = `
-                                       <div class="text-center text-gray-500">
-                                         <p class="text-sm">QR Code Image</p>
-                                         <p class="text-xs">(payment.jpg not found)</p>
-                                         <p class="text-xs mt-2">Check console for details</p>
-                                       </div>
-                                     `;
-                                   }
-                                 }}
-                                 onLoad={() => {
-                                   console.log('✅ QR code image loaded successfully');
-                                 }}
-                                 style={{ maxWidth: '100%', maxHeight: '100%' }}
-                                 crossOrigin="anonymous"
-                               />
-                             </div>
-                             
-                             {/* QR code image contains all payment details */}
-                           </div>
-                          
-                          <p className="text-sm text-gray-600 mt-3 text-center">Scan to pay with any UPI app</p>
-                          
-                          {/* Payment Details */}
-                          <div className="mt-4 text-center space-y-1">
-                            <p className="text-sm text-gray-600">
-                              Amount: <span className="font-semibold">₹{plans[selectedPlan].price}</span>
-                            </p>
-                            <p className="text-sm text-gray-600">
-                              Plan: <span className="font-semibold capitalize">{selectedPlan}</span>
-                            </p>
+                {/* Right Side - Form */}
+                <div className="space-y-6">
+                  <div className="space-y-4">
+                    {/* Transaction ID Input */}
+                    <div className="space-y-2">
+                      <Label htmlFor="transactionId" className="text-base font-medium">Transaction ID *</Label>
+                      <Input
+                        id="transactionId"
+                        type="text"
+                        placeholder="Enter your transaction ID"
+                        value={transactionId}
+                        onChange={(e) => {
+                          setTransactionId(e.target.value);
+                          // Clear error when user starts typing
+                          if (errors.transactionId) {
+                            setErrors(prev => ({ ...prev, transactionId: undefined }));
+                          }
+                        }}
+                        className={`w-full h-12 text-base ${errors.transactionId ? 'border-red-500' : ''}`}
+                      />
+                      {errors.transactionId && (
+                        <p className="text-red-500 text-sm mt-1">{errors.transactionId}</p>
+                      )}
+                    </div>
+
+                    {/* Screenshot Upload */}
+                    <div className="space-y-2">
+                      <Label htmlFor="screenshot" className="text-base font-medium">Payment Screenshot *</Label>
+                      <div className={`border-2 border-dashed rounded-lg p-6 text-center min-h-[200px] flex flex-col items-center justify-center ${
+                        errors.screenshot ? 'border-red-500 bg-red-50' : 'border-gray-300'
+                      }`}>
+                        {screenshotPreview ? (
+                          <div className="space-y-4 w-full">
+                            <img 
+                              src={screenshotPreview} 
+                              alt="Screenshot preview" 
+                              className="max-w-full h-40 object-contain mx-auto rounded border"
+                            />
+                            <Button
+                              type="button"
+                              variant="outline"
+                              size="sm"
+                              onClick={removeScreenshot}
+                              className="text-red-600 hover:text-red-700"
+                            >
+                              <X className="h-4 w-4 mr-1" />
+                              Remove Screenshot
+                            </Button>
                           </div>
-                        </div>
-
-                       {/* Right Side - Form */}
-                       <div className="space-y-6">
-                         <div className="space-y-4">
-                           {/* Transaction ID Input */}
-                           <div className="space-y-2">
-                             <Label htmlFor="transactionId" className="text-base font-medium">Transaction ID *</Label>
-                             <Input
-                               id="transactionId"
-                               type="text"
-                               placeholder="Enter your transaction ID"
-                               value={transactionId}
-                               onChange={(e) => setTransactionId(e.target.value)}
-                               className="w-full h-12 text-base"
-                             />
-                           </div>
-
-                           {/* Screenshot Upload */}
-                           <div className="space-y-2">
-                             <Label htmlFor="screenshot" className="text-base font-medium">Payment Screenshot *</Label>
-                             <div className="border-2 border-dashed border-gray-300 rounded-lg p-6 text-center min-h-[200px] flex flex-col items-center justify-center">
-                               {screenshotPreview ? (
-                                 <div className="space-y-4 w-full">
-                                   <img 
-                                     src={screenshotPreview} 
-                                     alt="Screenshot preview" 
-                                     className="max-w-full h-40 object-contain mx-auto rounded border"
-                                   />
-                                   <Button
-                                     type="button"
-                                     variant="outline"
-                                     size="sm"
-                                     onClick={removeScreenshot}
-                                     className="text-red-600 hover:text-red-700"
-                                   >
-                                     <X className="h-4 w-4 mr-1" />
-                                     Remove Screenshot
-                                   </Button>
-                                 </div>
-                               ) : (
-                                 <div className="space-y-4">
-                                   <Upload className="h-12 w-12 text-gray-400 mx-auto" />
-                                   <div>
-                                     <p className="text-sm text-gray-600 mb-2">Click to upload payment screenshot</p>
-                                     <p className="text-xs text-gray-500">PNG, JPG, JPEG up to 5MB</p>
-                                   </div>
-                                   <Button
-                                     type="button"
-                                     variant="outline"
-                                     size="sm"
-                                     onClick={() => fileInputRef.current?.click()}
-                                     className="mt-2"
-                                   >
-                                     Choose File
-                                   </Button>
-                                 </div>
-                               )}
-                               <input
-                                 ref={fileInputRef}
-                                 type="file"
-                                 accept="image/*"
-                                 onChange={handleScreenshotChange}
-                                 className="hidden"
-                               />
-                             </div>
-                           </div>
-                         </div>
-                         
-                         {/* Action Buttons */}
-                         <div className="flex space-x-3 pt-4">
-                           <Button 
-                             variant="outline" 
-                             className="flex-1 h-12 text-base"
-                             onClick={() => setIsPaymentOpen(false)}
-                           >
-                             Cancel
-                           </Button>
-                           <Button 
-                             className="flex-1 h-12 text-base bg-green-500 hover:bg-green-600"
-                             onClick={handleSubmitPayment}
-                             disabled={isProcessing || !transactionId.trim() || !screenshot}
-                           >
-                             {isProcessing ? 'Submitting...' : 'Submit Payment'}
-                           </Button>
-                         </div>
-                       </div>
-                     </div>
-                   </DialogContent>
-                </Dialog>
-              </CardContent>
-            </Card>
-          </div>
+                        ) : (
+                          <div className="space-y-4">
+                            <Upload className="h-12 w-12 text-gray-400 mx-auto" />
+                            <div>
+                              <p className="text-sm text-gray-600 mb-2">Click to upload payment screenshot</p>
+                              <p className="text-xs text-gray-500">PNG, JPG, JPEG up to 5MB (will be compressed automatically)</p>
+                            </div>
+                            <Button
+                              type="button"
+                              variant="outline"
+                              size="sm"
+                              onClick={() => fileInputRef.current?.click()}
+                              className="mt-2"
+                            >
+                              Choose File
+                            </Button>
+                          </div>
+                        )}
+                        <input
+                          ref={fileInputRef}
+                          type="file"
+                          accept="image/*"
+                          onChange={handleScreenshotChange}
+                          className="hidden"
+                        />
+                      </div>
+                      {errors.screenshot && (
+                        <p className="text-red-500 text-sm mt-2">{errors.screenshot}</p>
+                      )}
+                    </div>
+                  </div>
+                  
+                  {/* Action Buttons */}
+                  <div className="flex space-x-3 pt-4">
+                    <Button 
+                      variant="outline" 
+                      className="flex-1 h-12 text-base"
+                      onClick={() => setIsPaymentOpen(false)}
+                    >
+                      Cancel
+                    </Button>
+                    <Button 
+                      className="flex-1 h-12 text-base bg-green-500 hover:bg-green-600"
+                      onClick={handleSubmitPayment}
+                      disabled={isProcessing || !transactionId.trim() || !screenshot}
+                    >
+                      {isProcessing ? 'Submitting...' : 'Submit Payment'}
+                    </Button>
+                  </div>
+                </div>
+              </div>
+            </DialogContent>
+          </Dialog>
         </div>
       </section>
 
       {/* Features Grid */}
-      <section className="py-16 bg-white">
+      <section className="py-12 sm:py-16 bg-white">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-          <div className="text-center mb-12">
-            <h2 className="text-3xl font-bold text-gray-800 mb-4">
+          <div className="text-center mb-8 sm:mb-12">
+            <h2 className="text-2xl sm:text-3xl font-bold text-gray-800 mb-3 sm:mb-4 leading-tight">
               Premium Features
             </h2>
-            <p className="text-lg text-gray-600 max-w-2xl mx-auto">
+            <p className="text-base sm:text-lg text-gray-600 max-w-2xl mx-auto leading-relaxed">
               Get access to exclusive features that will help you find your perfect match faster
             </p>
           </div>
 
-          <div className="grid md:grid-cols-2 lg:grid-cols-4 gap-8">
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6 sm:gap-8">
             {features.map((feature, index) => (
               <Card key={index} className="text-center hover:shadow-lg transition-shadow">
                 <CardContent className="pt-6">
@@ -452,45 +616,45 @@ export default function Premium() {
         </div>
       </section>
 
-             <Footer />
+      <Footer />
 
-       {/* Success Dialog */}
-       <Dialog open={showSuccessDialog} onOpenChange={setShowSuccessDialog}>
-         <DialogContent className="sm:max-w-md">
-           <DialogHeader>
-             <DialogTitle className="text-center text-green-600">🎉 Thank You!</DialogTitle>
-             <DialogDescription className="text-center">
-               Your payment has been submitted successfully
-             </DialogDescription>
-           </DialogHeader>
-           
-           <div className="text-center space-y-4">
-             <div className="w-16 h-16 bg-green-100 rounded-full flex items-center justify-center mx-auto">
-               <Check className="h-8 w-8 text-green-600" />
-             </div>
-             
-             <div className="space-y-2">
-               <h3 className="font-semibold text-gray-800">Payment Submitted Successfully</h3>
-               <p className="text-sm text-gray-600">
-                 Thank you for registering for premium! Our team will review your payment and make your profile premium within 5 minutes.
-               </p>
-               <p className="text-sm text-gray-600 font-medium">
-                 Thank you for your patience.
-               </p>
-             </div>
-             
-             <Button 
-               className="w-full bg-green-500 hover:bg-green-600"
-               onClick={() => {
-                 setShowSuccessDialog(false);
-                 window.location.href = '/home';
-               }}
-             >
-               Continue to Home
-             </Button>
-           </div>
-         </DialogContent>
-       </Dialog>
-     </div>
-   );
- }
+      {/* Success Dialog */}
+      <Dialog open={showSuccessDialog} onOpenChange={setShowSuccessDialog}>
+        <DialogContent className="sm:max-w-md">
+          <DialogHeader>
+            <DialogTitle className="text-center text-green-600">🎉 Thank You!</DialogTitle>
+            <DialogDescription className="text-center">
+              Your payment has been submitted successfully
+            </DialogDescription>
+          </DialogHeader>
+          
+          <div className="text-center space-y-4">
+            <div className="w-16 h-16 bg-green-100 rounded-full flex items-center justify-center mx-auto">
+              <Check className="h-8 w-8 text-green-600" />
+            </div>
+            
+            <div className="space-y-2">
+              <h3 className="font-semibold text-gray-800">Payment Submitted Successfully</h3>
+              <p className="text-sm text-gray-600">
+                Thank you for registering for premium! Our team will review your payment and make your profile premium within 5 minutes.
+              </p>
+              <p className="text-sm text-gray-600 font-medium">
+                Thank you for your patience.
+              </p>
+            </div>
+            
+            <Button 
+              className="w-full bg-green-500 hover:bg-green-600"
+              onClick={() => {
+                setShowSuccessDialog(false);
+                window.location.href = '/';
+              }}
+            >
+              Continue to Home
+            </Button>
+          </div>
+        </DialogContent>
+      </Dialog>
+    </div>
+  );
+}

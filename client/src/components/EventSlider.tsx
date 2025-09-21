@@ -62,7 +62,7 @@ export default function EventSlider() {
 
   const handleConnectVendor = (serviceId: string) => {
     // TODO: Implement vendor connection logic
-    console.log(`Connecting to ${serviceId} vendor`);
+    // console.log(`Connecting to ${serviceId} vendor`);
   };
 
   return (

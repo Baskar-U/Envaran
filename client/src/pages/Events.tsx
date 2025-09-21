@@ -65,7 +65,7 @@ export default function Events() {
         setVendors(data);
       }
     } catch (error) {
-      console.error('Error fetching vendors:', error);
+      // console.error('Error fetching vendors:', error);
     } finally {
       setLoading(false);
     }
@@ -186,7 +186,7 @@ export default function Events() {
                 <p className="text-gray-600">{filteredVendors.length} vendors found</p>
               </div>
 
-              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8">
+              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6 lg:gap-8">
                 {filteredVendors.map((vendor) => (
                   <Card key={vendor.id} className="overflow-hidden hover:shadow-lg transition-shadow">
                     <div className="aspect-video relative">

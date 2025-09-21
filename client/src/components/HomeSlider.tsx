@@ -84,7 +84,7 @@ export default function HomeSlider() {
           {/* Content */}
           <div className="relative h-full flex items-center">
             <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 w-full">
-              <div className="grid lg:grid-cols-2 gap-12 items-center">
+              <div className="grid grid-cols-1 lg:grid-cols-2 gap-8 lg:gap-12 items-center">
                 {/* Text Content */}
                 <div className="text-white space-y-6">
                   <div className="flex items-center space-x-3">
@@ -106,7 +106,7 @@ export default function HomeSlider() {
                     size="lg" 
                     className={`bg-gradient-to-r ${slide.bgGradient} hover:opacity-90 text-white px-8 py-3 text-lg font-semibold`}
                     onClick={() => {
-                      console.log(`HomeSlider button clicked - navigating to ${slide.buttonLink}`);
+                      // console.log(`HomeSlider button clicked - navigating to ${slide.buttonLink}`);
                       window.location.href = slide.buttonLink;
                     }}
                   >

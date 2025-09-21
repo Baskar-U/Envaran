@@ -1,15 +1,13 @@
 import { Link } from "wouter";
 import { 
   Heart, 
-  Calendar, 
   Mail, 
   Phone, 
   MapPin, 
-  Facebook, 
-  Twitter, 
-  Instagram, 
-  Linkedin,
-  ArrowRight
+  ArrowRight,
+  FileText,
+  Shield,
+  Home
 } from "lucide-react";
 
 export default function Footer() {
@@ -30,20 +28,6 @@ export default function Footer() {
             <p className="text-gray-300 leading-relaxed">
               Connecting hearts and creating beautiful beginnings. Your journey to love and perfect celebrations starts here.
             </p>
-            <div className="flex space-x-4">
-              <a href="#" className="text-gray-400 hover:text-white transition-colors">
-                <Facebook className="h-5 w-5" />
-              </a>
-              <a href="#" className="text-gray-400 hover:text-white transition-colors">
-                <Twitter className="h-5 w-5" />
-              </a>
-              <a href="#" className="text-gray-400 hover:text-white transition-colors">
-                <Instagram className="h-5 w-5" />
-              </a>
-              <a href="#" className="text-gray-400 hover:text-white transition-colors">
-                <Linkedin className="h-5 w-5" />
-              </a>
-            </div>
           </div>
 
           {/* Matrimony Services */}
@@ -54,18 +38,24 @@ export default function Footer() {
             </h3>
             <ul className="space-y-2">
               <li>
+                <Link href="/" className="text-gray-300 hover:text-white transition-colors flex items-center">
+                  <Home className="h-3 w-3 mr-2" />
+                  Home
+                </Link>
+              </li>
+              <li>
                 <Link href="/profiles" className="text-gray-300 hover:text-white transition-colors flex items-center">
                   <ArrowRight className="h-3 w-3 mr-2" />
                   Browse Profiles
                 </Link>
               </li>
-              <li>
+              {/* <li>
                 <Link href="/matches" className="text-gray-300 hover:text-white transition-colors flex items-center">
                   <ArrowRight className="h-3 w-3 mr-2" />
                   My Matches
                 </Link>
-              </li>
-              <li>
+              </li> */}
+              {/* <li>
                 <Link href="/profile" className="text-gray-300 hover:text-white transition-colors flex items-center">
                   <ArrowRight className="h-3 w-3 mr-2" />
                   My Profile
@@ -76,6 +66,78 @@ export default function Footer() {
                   <ArrowRight className="h-3 w-3 mr-2" />
                   Messages
                 </Link>
+              </li> */}
+              {/* <li>
+                <Link href="/about" className="text-gray-300 hover:text-white transition-colors flex items-center">
+                  <ArrowRight className="h-3 w-3 mr-2" />
+                  About Us
+                </Link>
+              </li> */}
+              {/* <li>
+                <Link href="/privacy-policy" className="text-gray-300 hover:text-white transition-colors flex items-center">
+                  <Shield className="h-3 w-3 mr-2" />
+                  Privacy Policy
+                </Link>
+              </li> */}
+              {/* <li>
+                <Link href="/terms-and-conditions" className="text-gray-300 hover:text-white transition-colors flex items-center">
+                  <FileText className="h-3 w-3 mr-2" />
+                  Terms & Conditions
+                </Link>
+              </li> */}
+            </ul>
+          </div>
+
+
+          {/* Contact Info */}
+          <div className="space-y-4">
+            <h3 className="text-lg font-semibold">Contact Us</h3>
+            <div className="space-y-3">
+              <div className="flex items-center text-gray-300">
+                <Phone className="h-4 w-4 mr-3 text-royal-blue" />
+                <span>+91 9176 400 700</span>
+              </div>
+              <div className="flex items-center text-gray-300">
+                <Mail className="h-4 w-4 mr-3 text-royal-blue" />
+                <span>info@envaranmatrimony.com</span>
+              </div>
+              <div className="flex items-start text-gray-300">
+                <MapPin className="h-4 w-4 mr-3 mt-1 text-royal-blue" />
+                <span>2/20, Parthasarathi Street<br />Ayavoo Colony, Aminjikarai<br />Chennai, Tamil Nadu 600029</span>
+              </div>
+              <div className="pt-2">
+                <Link href="/contact" className="text-royal-blue hover:text-blue-400 transition-colors flex items-center">
+                  <ArrowRight className="h-3 w-3 mr-2" />
+                  Get in Touch
+                </Link>
+              </div>
+            </div>
+          </div>
+
+          {/* Quick Links */}
+          <div className="space-y-4">
+            <h3 className="text-lg font-semibold flex items-center">
+              <FileText className="h-5 w-5 mr-2 text-green-400" />
+              Quick Links
+            </h3>
+            <ul className="space-y-2">
+              <li>
+                <Link href="/privacy-policy" className="text-gray-300 hover:text-white transition-colors flex items-center">
+                  <Shield className="h-3 w-3 mr-2" />
+                  Privacy Policy
+                </Link>
+              </li>
+              <li>
+                <Link href="/terms-and-conditions" className="text-gray-300 hover:text-white transition-colors flex items-center">
+                  <FileText className="h-3 w-3 mr-2" />
+                  Terms & Conditions
+                </Link>
+              </li>
+              <li>
+                <Link href="/contact" className="text-gray-300 hover:text-white transition-colors flex items-center">
+                  <Mail className="h-3 w-3 mr-2" />
+                  Contact Us
+                </Link>
               </li>
               <li>
                 <Link href="/about" className="text-gray-300 hover:text-white transition-colors flex items-center">
@@ -84,59 +146,6 @@ export default function Footer() {
                 </Link>
               </li>
             </ul>
-          </div>
-
-          {/* Event Services */}
-          <div className="space-y-4">
-            <h3 className="text-lg font-semibold flex items-center">
-              <Calendar className="h-5 w-5 mr-2 text-purple-400" />
-              Event Services
-            </h3>
-            <ul className="space-y-2">
-              <li>
-                <Link href="/events" className="text-gray-300 hover:text-white transition-colors flex items-center">
-                  <ArrowRight className="h-3 w-3 mr-2" />
-                  Wedding Halls
-                </Link>
-              </li>
-              <li>
-                <Link href="/events" className="text-gray-300 hover:text-white transition-colors flex items-center">
-                  <ArrowRight className="h-3 w-3 mr-2" />
-                  Catering Services
-                </Link>
-              </li>
-              <li>
-                <Link href="/events" className="text-gray-300 hover:text-white transition-colors flex items-center">
-                  <ArrowRight className="h-3 w-3 mr-2" />
-                  Photography
-                </Link>
-              </li>
-              <li>
-                <Link href="/events" className="text-gray-300 hover:text-white transition-colors flex items-center">
-                  <ArrowRight className="h-3 w-3 mr-2" />
-                  Decorations
-                </Link>
-              </li>
-            </ul>
-          </div>
-
-          {/* Contact Info */}
-          <div className="space-y-4">
-            <h3 className="text-lg font-semibold">Contact Us</h3>
-            <div className="space-y-3">
-                             <div className="flex items-center text-gray-300">
-                 <Phone className="h-4 w-4 mr-3 text-royal-blue" />
-                 <span>+91 9176 400 700</span>
-               </div>
-               <div className="flex items-center text-gray-300">
-                 <Mail className="h-4 w-4 mr-3 text-royal-blue" />
-                 <span>info@envaranmatrimony.com</span>
-               </div>
-              <div className="flex items-start text-gray-300">
-                <MapPin className="h-4 w-4 mr-3 mt-1 text-royal-blue" />
-                <span>123 Matrimony Street, Love City, LC 12345</span>
-              </div>
-            </div>
           </div>
         </div>
       </div>
@@ -149,10 +158,10 @@ export default function Footer() {
               © {currentYear}Powered By Cookies Tech. All rights reserved.
             </div>
             <div className="flex space-x-6 text-sm">
-              <Link href="/privacy" className="text-gray-400 hover:text-white transition-colors">
+              <Link href="/privacy-policy" className="text-gray-400 hover:text-white transition-colors">
                 Privacy Policy
               </Link>
-              <Link href="/terms" className="text-gray-400 hover:text-white transition-colors">
+              <Link href="/terms-and-conditions" className="text-gray-400 hover:text-white transition-colors">
                 Terms of Service
               </Link>
               <Link href="/about" className="text-gray-400 hover:text-white transition-colors">

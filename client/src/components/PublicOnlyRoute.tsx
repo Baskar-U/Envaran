@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useEffect } from 'react';
 import { useAuth } from '@/hooks/useAuth';
 import { useLocation } from 'wouter';
 
@@ -7,9 +7,17 @@ interface PublicOnlyRouteProps {
   redirectTo?: string;
 }
 
-export default function PublicOnlyRoute({ children, redirectTo = '/home' }: PublicOnlyRouteProps) {
+export default function PublicOnlyRoute({ children, redirectTo = '/' }: PublicOnlyRouteProps) {
   const { user, loading } = useAuth();
   const [, setLocation] = useLocation();
+
+  // Redirect to home if user is already authenticated
+  useEffect(() => {
+    if (user) {
+      // console.log('User is already authenticated, redirecting to home');
+      setLocation(redirectTo);
+    }
+  }, [user, setLocation, redirectTo]);
 
   // Show loading while checking authentication
   if (loading) {
@@ -23,10 +31,7 @@ export default function PublicOnlyRoute({ children, redirectTo = '/home' }: Publ
     );
   }
 
-  // Redirect to home if user is already authenticated
   if (user) {
-    console.log('User is already authenticated, redirecting to home');
-    setLocation(redirectTo);
     return null;
   }
 

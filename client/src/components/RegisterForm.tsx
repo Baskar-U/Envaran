@@ -41,10 +41,10 @@ export default function RegisterForm({ onSuccess, onSwitchToLogin }: RegisterFor
     }
 
     // Temporarily skip connection test while updating Firestore rules
-    console.log('Skipping connection test - proceeding with registration...');
+    // console.log('Skipping connection test - proceeding with registration...');
 
     try {
-      console.log('RegisterForm: Starting registration...', formData);
+      // console.log('RegisterForm: Starting registration...', formData);
       
       const userData = {
         firstName: formData.firstName,
@@ -57,15 +57,15 @@ export default function RegisterForm({ onSuccess, onSwitchToLogin }: RegisterFor
         subCaste: formData.subCaste
       };
 
-      console.log('RegisterForm: Calling registerWithEmail with userData:', userData);
+      // console.log('RegisterForm: Calling registerWithEmail with userData:', userData);
       
       const result = await registerWithEmail(formData.email, formData.password, userData);
       
-      console.log('RegisterForm: Registration successful:', result);
+      // console.log('RegisterForm: Registration successful:', result);
       
       onSuccess?.();
     } catch (error: any) {
-      console.error('RegisterForm: Registration failed:', error);
+      // console.error('RegisterForm: Registration failed:', error);
       setError(error.message);
     } finally {
       setLoading(false);
