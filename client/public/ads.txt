@@ -1,0 +1,8 @@
+# ads.txt file for SecondChanceMatrimony
+# This file helps Google AdSense verify authorized sellers of ad inventory
+
+# Google AdSense
+google.com, pub-6343948689807963, DIRECT, f08c47fec0942fa0
+
+
+

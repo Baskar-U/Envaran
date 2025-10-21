@@ -38,6 +38,8 @@ const generateEnvaranId = async (): Promise<string> => {
   }
 };
 
+type SiblingRelation = 'Elder Sister' | 'Elder Brother' | 'Younger Sister' | 'Younger Brother';
+
 interface RegistrationFormData {
   // Personal Details
   name: string;
@@ -61,6 +63,14 @@ interface RegistrationFormData {
   motherJob: string;
   motherAlive: string;
   orderOfBirth: string;
+  hasSiblings?: string; // yes/no
+  numSiblings?: number | string;
+  siblings?: Array<{
+    relation: SiblingRelation;
+    name: string;
+    age: string;
+    maritalStatus?: string;
+  }>;
   
   // Physical Attributes
   height: string;
@@ -122,6 +132,7 @@ interface RegistrationFormData {
   
   // Images
   profileImage: string; // Base64 encoded profile image
+  aadharImage?: string; // Base64 encoded aadhar card image
   
   // Account Details
   email: string;
@@ -274,6 +285,9 @@ const RegistrationForm: React.FC = () => {
     motherJob: '',
     motherAlive: '',
     orderOfBirth: '',
+    hasSiblings: 'No',
+    numSiblings: '',
+    siblings: [],
     
     // Physical Attributes
     height: '',
@@ -335,6 +349,7 @@ const RegistrationForm: React.FC = () => {
     
     // Images
     profileImage: '',
+    aadharImage: '',
     
     // Account Details
     email: '',
@@ -404,12 +419,12 @@ const RegistrationForm: React.FC = () => {
     }
   }, [casteData]);
 
-  const handleInputChange = (field: keyof RegistrationFormData, value: string | string[] | number | null) => {
+  function handleInputChange<K extends keyof RegistrationFormData>(field: K, value: RegistrationFormData[K]) {
     setFormData(prev => ({
       ...prev,
-      [field]: value
+      [field]: value,
     }));
-  };
+  }
 
   // Handle caste selection and update sub-caste options
   const handleCasteChange = (caste: string) => {
@@ -585,6 +600,17 @@ const RegistrationForm: React.FC = () => {
         motherJob: formData.motherJob,
         motherAlive: formData.motherAlive,
         orderOfBirth: formData.orderOfBirth,
+        hasSiblings: formData.hasSiblings || 'No',
+        numSiblings: (() => {
+          const n = typeof formData.numSiblings === 'string' ? parseInt(formData.numSiblings || '0') : (formData.numSiblings || 0);
+          return isNaN(n) ? 0 : n;
+        })(),
+        siblings: (formData.siblings || []).map(s => ({
+          relation: s.relation,
+          name: s.name,
+          age: s.age,
+          maritalStatus: s.maritalStatus || '',
+        })),
         
         // Physical Attributes
         height: formData.height,
@@ -660,6 +686,7 @@ const RegistrationForm: React.FC = () => {
           // });
           return formData.profileImage;
         })(),
+        aadharImage: formData.aadharImage || '',
         profileImageUrl: (() => {
           // console.log('💾 RegistrationForm: Saving profile image URL to database...');
           // console.log('📊 RegistrationForm: Profile image URL data:', {
@@ -1150,6 +1177,129 @@ const RegistrationForm: React.FC = () => {
           </SelectContent>
         </Select>
       </div>
+
+      {/* Siblings Section */}
+      <div className="mt-6 space-y-4">
+        <h4 className="text-md font-medium border-b pb-2">Siblings</h4>
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-4 items-end">
+          <div>
+            <Label>Do you have sister/brother?</Label>
+            <Select value={formData.hasSiblings} onValueChange={(value) => {
+              handleInputChange('hasSiblings', value);
+              if (value === 'No') {
+                handleInputChange('numSiblings', '');
+                handleInputChange('siblings', []);
+              }
+            }}>
+              <SelectTrigger>
+                <SelectValue placeholder="Select" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="Yes">Yes</SelectItem>
+                <SelectItem value="No">No</SelectItem>
+              </SelectContent>
+            </Select>
+          </div>
+          {formData.hasSiblings === 'Yes' && (
+            <div>
+              <Label>How many?</Label>
+              <Input
+                type="number"
+                min={0}
+                value={String(formData.numSiblings || '')}
+                onChange={(e) => {
+                  const count = Math.max(0, parseInt(e.target.value || '0'));
+                  handleInputChange('numSiblings', e.target.value);
+                  const current = formData.siblings || [];
+                  const next = [...current];
+                  if (count > current.length) {
+                    for (let i = current.length; i < count; i++) {
+                      next.push({ relation: 'Elder Sister', name: '', age: '', maritalStatus: '' });
+                    }
+                  } else if (count < current.length) {
+                    next.length = count;
+                  }
+                  handleInputChange('siblings', next);
+                }}
+                placeholder="Enter number"
+              />
+            </div>
+          )}
+        </div>
+
+        {formData.hasSiblings === 'Yes' && (formData.siblings || []).map((s, i) => (
+          <div key={i} className="grid grid-cols-1 md:grid-cols-4 gap-4">
+            <div>
+              <Label>Relation</Label>
+              <Select
+                value={s.relation}
+                onValueChange={(value) => {
+                  const list = [...(formData.siblings || [])];
+                  list[i] = { ...list[i], relation: value as SiblingRelation };
+                  handleInputChange('siblings', list);
+                }}
+              >
+                <SelectTrigger>
+                  <SelectValue placeholder="Select" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="Elder Sister">Elder Sister</SelectItem>
+                  <SelectItem value="Elder Brother">Elder Brother</SelectItem>
+                  <SelectItem value="Younger Sister">Younger Sister</SelectItem>
+                  <SelectItem value="Younger Brother">Younger Brother</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+            <div>
+              <Label>Name</Label>
+              <Input
+                value={s.name}
+                onChange={(e) => {
+                  const list = [...(formData.siblings || [])];
+                  list[i] = { ...list[i], name: e.target.value };
+                  handleInputChange('siblings', list);
+                }}
+                placeholder="Enter name"
+              />
+            </div>
+            <div>
+              <Label>Age</Label>
+              <Input
+                type="number"
+                min={0}
+                value={s.age}
+                onChange={(e) => {
+                  const list = [...(formData.siblings || [])];
+                  list[i] = { ...list[i], age: e.target.value };
+                  handleInputChange('siblings', list);
+                }}
+                placeholder="Age"
+              />
+            </div>
+            <div>
+              <Label>Marital Status</Label>
+              <Select
+                value={s.maritalStatus || ''}
+                onValueChange={(value) => {
+                  const list = [...(formData.siblings || [])];
+                  list[i] = { ...list[i], maritalStatus: value };
+                  handleInputChange('siblings', list);
+                }}
+              >
+                <SelectTrigger>
+                  <SelectValue placeholder="Select" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="Unmarried">Unmarried</SelectItem>
+                  <SelectItem value="Married">Married</SelectItem>
+                  <SelectItem value="Divorced">Divorced</SelectItem>
+                  <SelectItem value="Widowed">Widowed</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+          </div>
+        ))}
+      </div>
     </div>
   );
 
@@ -1238,22 +1388,104 @@ const RegistrationForm: React.FC = () => {
               <SelectValue placeholder="Select qualification" />
             </SelectTrigger>
             <SelectContent>
-              <SelectItem value="High School">High School</SelectItem>
-              <SelectItem value="Diploma">Diploma</SelectItem>
-              <SelectItem value="Bachelor's Degree">Bachelor's Degree</SelectItem>
-              <SelectItem value="Master's Degree">Master's Degree</SelectItem>
-              <SelectItem value="PhD">PhD</SelectItem>
-              <SelectItem value="CA">CA (Chartered Accountant)</SelectItem>
-              <SelectItem value="CS">CS (Company Secretary)</SelectItem>
-              <SelectItem value="ICWA">ICWA</SelectItem>
-              <SelectItem value="MBBS">MBBS</SelectItem>
-              <SelectItem value="BDS">BDS</SelectItem>
-              <SelectItem value="B.Tech">B.Tech</SelectItem>
-              <SelectItem value="M.Tech">M.Tech</SelectItem>
-              <SelectItem value="BBA">BBA</SelectItem>
-              <SelectItem value="MBA">MBA</SelectItem>
-              <SelectItem value="LLB">LLB</SelectItem>
-              <SelectItem value="Other">Other</SelectItem>
+            <SelectItem value="Ph.D.">Ph.D.</SelectItem>
+<SelectItem value="DM">DM</SelectItem>
+<SelectItem value="Postdoctoral fellow">Postdoctoral fellow</SelectItem>
+<SelectItem value="FNB">Fellow of National Board (FNB)</SelectItem>
+<SelectItem value="IAS">IAS</SelectItem>
+<SelectItem value="IPS">IPS</SelectItem>
+<SelectItem value="IRS">IRS</SelectItem>
+<SelectItem value="IES">IES</SelectItem>
+<SelectItem value="IFS">IFS</SelectItem>
+<SelectItem value="Other Degree in Service">Other Degree in Service</SelectItem>
+<SelectItem value="CA">CA</SelectItem>
+<SelectItem value="ICWA">ICWA</SelectItem>
+<SelectItem value="CS">CS</SelectItem>
+<SelectItem value="CFA">CFA (Chartered Financial Analyst)</SelectItem>
+<SelectItem value="Other Degree in Finance">Other Degree in Finance</SelectItem>
+<SelectItem value="M.Phil.">M.Phil.</SelectItem>
+<SelectItem value="MCom">MCom</SelectItem>
+<SelectItem value="M.Sc.">M.Sc.</SelectItem>
+<SelectItem value="M.A.">M.A.</SelectItem>
+<SelectItem value="M.Ed.">M.Ed.</SelectItem>
+<SelectItem value="MLIS">MLIS</SelectItem>
+<SelectItem value="MSW">MSW</SelectItem>
+<SelectItem value="Other Master Degree in Arts / Science / Commerce">Other Master Degree in Arts / Science / Commerce</SelectItem>
+<SelectItem value="MFA">MFA</SelectItem>
+<SelectItem value="M.Des">M.Des</SelectItem>
+<SelectItem value="M.S.(Engg.)">M.S.(Engg.)</SelectItem>
+<SelectItem value="M.Arch.">M.Arch.</SelectItem>
+<SelectItem value="MCA">MCA</SelectItem>
+<SelectItem value="PGDCA">PGDCA</SelectItem>
+<SelectItem value="ME">ME</SelectItem>
+<SelectItem value="M.Tech.">M.Tech.</SelectItem>
+<SelectItem value="M.Sc. IT / Computer Science">M.Sc. IT / Computer Science</SelectItem>
+<SelectItem value="Other Masters Degree in Engineering / Computers">Other Masters Degree in Engineering / Computers</SelectItem>
+<SelectItem value="M.L.">M.L.</SelectItem>
+<SelectItem value="LL.M.">LL.M.</SelectItem>
+<SelectItem value="Other Master Degree in Legal">Other Master Degree in Legal</SelectItem>
+<SelectItem value="MHM (Hotel Management)">MHM (Hotel Management)</SelectItem>
+<SelectItem value="MBA">MBA</SelectItem>
+<SelectItem value="PGDM">PGDM</SelectItem>
+<SelectItem value="MHRM">MHRM (Human Resource Management)</SelectItem>
+<SelectItem value="MFM">MFM (Financial Management)</SelectItem>
+<SelectItem value="Other Master Degree in Management">Other Master Degree in Management</SelectItem>
+<SelectItem value="MHA / MHM (Hospital Administration)">MHA / MHM (Hospital Administration)</SelectItem>
+<SelectItem value="MD / MS (Medical)">MD / MS (Medical)</SelectItem>
+<SelectItem value="MDS">MDS</SelectItem>
+<SelectItem value="MVSc">MVSc</SelectItem>
+<SelectItem value="MCh">MCh</SelectItem>
+<SelectItem value="DNB">DNB</SelectItem>
+<SelectItem value="B.Phil.">B.Phil.</SelectItem>
+<SelectItem value="B.Com.">B.Com.</SelectItem>
+<SelectItem value="B.Sc.">B.Sc.</SelectItem>
+<SelectItem value="B.A.">B.A.</SelectItem>
+<SelectItem value="B.Ed.">B.Ed.</SelectItem>
+<SelectItem value="Aviation Degree">Aviation Degree</SelectItem>
+<SelectItem value="BFA">BFA</SelectItem>
+<SelectItem value="BLIS">BLIS</SelectItem>
+<SelectItem value="B.S.W">B.S.W</SelectItem>
+<SelectItem value="B.M.M.">B.M.M.</SelectItem>
+<SelectItem value="BFT">BFT</SelectItem>
+<SelectItem value="Other Bachelor Degree in Arts / Science / Commerce">Other Bachelor Degree in Arts / Science / Commerce</SelectItem>
+<SelectItem value="B.Des">B.Des</SelectItem>
+<SelectItem value="BCA">BCA</SelectItem>
+<SelectItem value="Aeronautical Engineering">Aeronautical Engineering</SelectItem>
+<SelectItem value="B.Arch">B.Arch</SelectItem>
+<SelectItem value="B.Plan">B.Plan</SelectItem>
+<SelectItem value="BE">BE</SelectItem>
+<SelectItem value="B.Tech.">B.Tech.</SelectItem>
+<SelectItem value="Other Bachelor Degree in Engineering / Computers">Other Bachelor Degree in Engineering / Computers</SelectItem>
+<SelectItem value="B.Sc IT/ Computer Science">B.Sc IT/ Computer Science</SelectItem>
+<SelectItem value="B.S.(Engineering)">B.S.(Engineering)</SelectItem>
+<SelectItem value="BGL">BGL</SelectItem>
+<SelectItem value="B.L.">B.L.</SelectItem>
+<SelectItem value="LL.B.">LL.B.</SelectItem>
+<SelectItem value="Other Bachelor Degree in Legal">Other Bachelor Degree in Legal</SelectItem>
+<SelectItem value="BHM (Hotel Management)">BHM (Hotel Management)</SelectItem>
+<SelectItem value="BBA">BBA</SelectItem>
+<SelectItem value="BFM (Financial Management)">BFM (Financial Management)</SelectItem>
+<SelectItem value="Other Bachelor Degree in Management">Other Bachelor Degree in Management</SelectItem>
+<SelectItem value="BHA / BHM (Hospital Administration)">BHA / BHM (Hospital Administration)</SelectItem>
+<SelectItem value="MBBS">MBBS</SelectItem>
+<SelectItem value="BDS">BDS</SelectItem>
+<SelectItem value="BVSc">BVSc</SelectItem>
+<SelectItem value="BHMS">BHMS</SelectItem>
+<SelectItem value="B.A.M.S.">B.A.M.S.</SelectItem>
+<SelectItem value="BSMS">BSMS</SelectItem>
+<SelectItem value="BUMS">BUMS</SelectItem>
+<SelectItem value="Trade School">Trade School</SelectItem>
+<SelectItem value="Diploma">Diploma</SelectItem>
+<SelectItem value="Polytechnic">Polytechnic</SelectItem>
+<SelectItem value="Others in Diploma">Others in Diploma</SelectItem>
+<SelectItem value="Higher Secondary School / High School">Higher Secondary School / High School</SelectItem>
+<SelectItem value="BPT">BPT</SelectItem>
+<SelectItem value="BPharm">BPharm</SelectItem>
+<SelectItem value="Other Bachelor Degree in Medicine">Other Bachelor Degree in Medicine</SelectItem>
+<SelectItem value="B.Sc. Nursing">B.Sc. Nursing</SelectItem>
+<SelectItem value="MPT">MPT</SelectItem>
+<SelectItem value="M.Pharm">M.Pharm</SelectItem>
+<SelectItem value="Other Master Degree in Medicine">Other Master Degree in Medicine</SelectItem>
             </SelectContent>
           </Select>
         </div>
@@ -1281,21 +1513,145 @@ const RegistrationForm: React.FC = () => {
               <SelectValue placeholder="Select occupation" />
             </SelectTrigger>
             <SelectContent>
-              <SelectItem value="Software Engineer">Software Engineer</SelectItem>
-              <SelectItem value="Doctor">Doctor</SelectItem>
-              <SelectItem value="Teacher">Teacher</SelectItem>
-              <SelectItem value="Business Owner">Business Owner</SelectItem>
-              <SelectItem value="Government Employee">Government Employee</SelectItem>
-              <SelectItem value="Private Employee">Private Employee</SelectItem>
-              <SelectItem value="Engineer">Engineer</SelectItem>
-              <SelectItem value="Lawyer">Lawyer</SelectItem>
-              <SelectItem value="CA">Chartered Accountant</SelectItem>
-              <SelectItem value="Banking">Banking</SelectItem>
-              <SelectItem value="Sales">Sales</SelectItem>
-              <SelectItem value="Marketing">Marketing</SelectItem>
-              <SelectItem value="Designer">Designer</SelectItem>
-              <SelectItem value="Student">Student</SelectItem>
-              <SelectItem value="Other">Other</SelectItem>
+            <SelectItem value="Administrative Professional">Administrative Professional</SelectItem>
+<SelectItem value="Clerk">Clerk</SelectItem>
+<SelectItem value="Officer">Officer</SelectItem>
+<SelectItem value="Supervisor">Supervisor</SelectItem>
+<SelectItem value="Manager">Manager</SelectItem>
+<SelectItem value="Executive">Executive</SelectItem>
+<SelectItem value="Human Resources Professional">Human Resources Professional</SelectItem>
+<SelectItem value="Secretary / Front Office">Secretary / Front Office</SelectItem>
+<SelectItem value="Agriculture & Farming Professional">Agriculture & Farming Professional</SelectItem>
+<SelectItem value="Horticulturist">Horticulturist</SelectItem>
+<SelectItem value="Air Hostess / Flight Attendant">Air Hostess / Flight Attendant</SelectItem>
+<SelectItem value="Airline Professional">Airline Professional</SelectItem>
+<SelectItem value="Pilot">Pilot</SelectItem>
+<SelectItem value="Architect">Architect</SelectItem>
+<SelectItem value="Interior Designer">Interior Designer</SelectItem>
+<SelectItem value="Chartered Accountant">Chartered Accountant</SelectItem>
+<SelectItem value="Accounts / Finance Professional">Accounts / Finance Professional</SelectItem>
+<SelectItem value="Auditor">Auditor</SelectItem>
+<SelectItem value="Company Secretary">Company Secretary</SelectItem>
+<SelectItem value="Banking Service Professional">Banking Service Professional</SelectItem>
+<SelectItem value="Financial Analyst / Planning">Financial Analyst / Planning</SelectItem>
+<SelectItem value="Financial Accountant">Financial Accountant</SelectItem>
+<SelectItem value="Investment Professional">Investment Professional</SelectItem>
+<SelectItem value="Fashion Designer">Fashion Designer</SelectItem>
+<SelectItem value="Beautician">Beautician</SelectItem>
+<SelectItem value="Hair Stylist">Hair Stylist</SelectItem>
+<SelectItem value="Jewellery designer">Jewellery designer</SelectItem>
+<SelectItem value="Designer (others)">Designer (others)</SelectItem>
+<SelectItem value="Makeup Artist">Makeup Artist</SelectItem>
+<SelectItem value="Customer Service Professional">Customer Service Professional</SelectItem>
+<SelectItem value="BPO / KPO / ITes Professional">BPO / KPO / ITes Professional</SelectItem>
+<SelectItem value="Civil Services (IAS / IES / IFS / IPS / IRS)">Civil Services (IAS / IES / IFS / IPS / IRS)</SelectItem>
+<SelectItem value="Marketing Professional">Marketing Professional</SelectItem>
+<SelectItem value="Sales Professional">Sales Professional</SelectItem>
+<SelectItem value="Consultant">Consultant</SelectItem>
+<SelectItem value="Analyst">Analyst</SelectItem>
+<SelectItem value="Corporate Communication">Corporate Communication</SelectItem>
+<SelectItem value="Corporate Planning">Corporate Planning</SelectItem>
+<SelectItem value="Operations Management">Operations Management</SelectItem>
+<SelectItem value="Senior Manager / Manager">Senior Manager / Manager</SelectItem>
+<SelectItem value="Subject Matter Expert">Subject Matter Expert</SelectItem>
+<SelectItem value="Business Development Professional">Business Development Professional</SelectItem>
+<SelectItem value="Content Writer">Content Writer</SelectItem>
+<SelectItem value="Army">Army</SelectItem>
+<SelectItem value="Navy">Navy</SelectItem>
+<SelectItem value="Air Force">Air Force</SelectItem>
+<SelectItem value="Defence Services (Others)">Defence Services (Others)</SelectItem>
+<SelectItem value="Paramilitary">Paramilitary</SelectItem>
+<SelectItem value="Teaching / Academician">Teaching / Academician</SelectItem>
+<SelectItem value="Professor / Lecturer">Professor / Lecturer</SelectItem>
+<SelectItem value="Education Professional">Education Professional</SelectItem>
+<SelectItem value="Training Professional">Training Professional</SelectItem>
+<SelectItem value="Research Assistant">Research Assistant</SelectItem>
+<SelectItem value="Research Scholar">Research Scholar</SelectItem>
+<SelectItem value="Engineer - Non IT">Engineer - Non IT</SelectItem>
+<SelectItem value="Designer">Designer</SelectItem>
+<SelectItem value="Project Manager - Non IT">Project Manager - Non IT</SelectItem>
+<SelectItem value="Civil Engineer">Civil Engineer</SelectItem>
+<SelectItem value="Electronics / Telecom Engineer">Electronics / Telecom Engineer</SelectItem>
+<SelectItem value="Mechanical / Production Engineer">Mechanical / Production Engineer</SelectItem>
+<SelectItem value="Quality Assurance Engineer - Non IT">Quality Assurance Engineer - Non IT</SelectItem>
+<SelectItem value="Product Manager - Non IT">Product Manager - Non IT</SelectItem>
+<SelectItem value="Hotel / Hospitality Professional">Hotel / Hospitality Professional</SelectItem>
+<SelectItem value="Restaurant / Catering Professional">Restaurant / Catering Professional</SelectItem>
+<SelectItem value="Chef / Cook">Chef / Cook</SelectItem>
+<SelectItem value="Software Professional">Software Professional</SelectItem>
+<SelectItem value="Hardware Professional">Hardware Professional</SelectItem>
+<SelectItem value="Product Manager">Product Manager</SelectItem>
+<SelectItem value="Program Manager">Program Manager</SelectItem>
+<SelectItem value="Project Manager">Project Manager</SelectItem>
+<SelectItem value="Animator">Animator</SelectItem>
+<SelectItem value="Cyber / Network Security">Cyber / Network Security</SelectItem>
+<SelectItem value="UI / UX Designer">UI / UX Designer</SelectItem>
+<SelectItem value="Web / Graphic Designer">Web / Graphic Designer</SelectItem>
+<SelectItem value="Software Consultant">Software Consultant</SelectItem>
+<SelectItem value="Data Analyst">Data Analyst</SelectItem>
+<SelectItem value="Data Scientist">Data Scientist</SelectItem>
+<SelectItem value="Network Engineer">Network Engineer</SelectItem>
+<SelectItem value="Quality Assurance Engineer">Quality Assurance Engineer</SelectItem>
+<SelectItem value="Lawyer & Legal Professional">Lawyer & Legal Professional</SelectItem>
+<SelectItem value="Legal Assistant">Legal Assistant</SelectItem>
+<SelectItem value="Law Enforcement Officer">Law Enforcement Officer</SelectItem>
+<SelectItem value="Police">Police</SelectItem>
+<SelectItem value="Nurse">Nurse</SelectItem>
+<SelectItem value="Healthcare Professional">Healthcare Professional</SelectItem>
+<SelectItem value="Paramedical Professional">Paramedical Professional</SelectItem>
+<SelectItem value="Pharmacist">Pharmacist</SelectItem>
+<SelectItem value="Physiotherapist">Physiotherapist</SelectItem>
+<SelectItem value="Psychologist">Psychologist</SelectItem>
+<SelectItem value="Therapist">Therapist</SelectItem>
+<SelectItem value="Medical Transcriptionist">Medical Transcriptionist</SelectItem>
+<SelectItem value="Dietician / Nutritionist">Dietician / Nutritionist</SelectItem>
+<SelectItem value="Lab Technician">Lab Technician</SelectItem>
+<SelectItem value="Medical Representative">Medical Representative</SelectItem>
+<SelectItem value="Advertising / PR Professional">Advertising / PR Professional</SelectItem>
+<SelectItem value="Media Professional">Media Professional</SelectItem>
+<SelectItem value="Entertainment Professional">Entertainment Professional</SelectItem>
+<SelectItem value="Event Management Professional">Event Management Professional</SelectItem>
+<SelectItem value="Journalist">Journalist</SelectItem>
+<SelectItem value="Designer">Designer</SelectItem>
+<SelectItem value="Actor / Model">Actor / Model</SelectItem>
+<SelectItem value="Artist">Artist</SelectItem>
+<SelectItem value="Mariner / Merchant Navy">Mariner / Merchant Navy</SelectItem>
+<SelectItem value="Sailor">Sailor</SelectItem>
+<SelectItem value="Scientist / Researcher">Scientist / Researcher</SelectItem>
+<SelectItem value="CXO / President, Director, Chairman">CXO / President, Director, Chairman</SelectItem>
+<SelectItem value="VP / AVP / GM / DGM / AGM">VP / AVP / GM / DGM / AGM</SelectItem>
+<SelectItem value="Doctor">Doctor</SelectItem>
+<SelectItem value="Veterinary Doctor">Veterinary Doctor</SelectItem>
+<SelectItem value="Dentist">Dentist</SelectItem>
+<SelectItem value="Surgeon">Surgeon</SelectItem>
+<SelectItem value="Social Worker / Volunteer / NGO">Social Worker / Volunteer / NGO</SelectItem>
+<SelectItem value="Arts & Craftsman">Arts & Craftsman</SelectItem>
+<SelectItem value="Technician">Technician</SelectItem>
+<SelectItem value="Sportsperson">Sportsperson</SelectItem>
+<SelectItem value="Librarian">Librarian</SelectItem>
+<SelectItem value="Business Owner / Entrepreneur">Business Owner / Entrepreneur</SelectItem>
+<SelectItem value="Transportation / Logistics Professional">Transportation / Logistics Professional</SelectItem>
+<SelectItem value="Agent / Broker / Trader">Agent / Broker / Trader</SelectItem>
+<SelectItem value="Contractor">Contractor</SelectItem>
+<SelectItem value="Fitness Professional">Fitness Professional</SelectItem>
+<SelectItem value="Security Professional">Security Professional</SelectItem>
+<SelectItem value="Travel Professional">Travel Professional</SelectItem>
+<SelectItem value="Singer">Singer</SelectItem>
+<SelectItem value="Writer">Writer</SelectItem>
+<SelectItem value="Associate">Associate</SelectItem>
+<SelectItem value="Builder">Builder</SelectItem>
+<SelectItem value="Chemist">Chemist</SelectItem>
+<SelectItem value="CNC Operator">CNC Operator</SelectItem>
+<SelectItem value="Distributor">Distributor</SelectItem>
+<SelectItem value="Driver">Driver</SelectItem>
+<SelectItem value="Freelancer">Freelancer</SelectItem>
+<SelectItem value="Mechanic">Mechanic</SelectItem>
+<SelectItem value="Musician">Musician</SelectItem>
+<SelectItem value="Photo / Videographer">Photo / Videographer</SelectItem>
+<SelectItem value="Surveyor">Surveyor</SelectItem>
+<SelectItem value="Tailor">Tailor</SelectItem>
+<SelectItem value="Politician">Politician</SelectItem>
+<SelectItem value="Others">Others</SelectItem>
             </SelectContent>
           </Select>
         </div>
@@ -1383,7 +1739,95 @@ const RegistrationForm: React.FC = () => {
 
   const renderStep5 = () => (
     <div className="space-y-4">
-      <h3 className="text-lg font-semibold">Jaadhagam (Raasi) Image</h3>
+      <h3 className="text-lg font-semibold">Astrology Details</h3>
+      <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+        <div>
+          <Label>Time of Birth</Label>
+          <div className="grid grid-cols-3 gap-2">
+            <Select value={formData.timeOfBirthHour} onValueChange={(v) => handleInputChange('timeOfBirthHour', v)}>
+              <SelectTrigger>
+                <SelectValue placeholder="HH" />
+              </SelectTrigger>
+              <SelectContent>
+                {Array.from({ length: 12 }, (_, i) => String(i === 0 ? 12 : i)).map(h => (
+                  <SelectItem key={h} value={h}>{h}</SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+            <Select value={formData.timeOfBirthMinute} onValueChange={(v) => handleInputChange('timeOfBirthMinute', v)}>
+              <SelectTrigger>
+                <SelectValue placeholder="MM" />
+              </SelectTrigger>
+              <SelectContent>
+                {['00','01','02','03','04','05','06','07','08','09', ...Array.from({length:51}, (_,i)=>String(i+10))].map(m => (
+                  <SelectItem key={m} value={m}>{m}</SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+            <Select value={formData.timeOfBirthPeriod} onValueChange={(v) => handleInputChange('timeOfBirthPeriod', v)}>
+              <SelectTrigger>
+                <SelectValue placeholder="AM/PM" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="AM">AM</SelectItem>
+                <SelectItem value="PM">PM</SelectItem>
+              </SelectContent>
+            </Select>
+          </div>
+        </div>
+
+        <div>
+          <Label>Raasi</Label>
+          <Select value={formData.raasi} onValueChange={(v) => handleInputChange('raasi', v)}>
+            <SelectTrigger>
+              <SelectValue placeholder="Select Raasi" />
+            </SelectTrigger>
+            <SelectContent>
+              {['Mesham','Rishabam','Mithunam','Kadagam','Simmam','Kanni','Thulam','Vrischigam','Dhanusu','Makaram','Kumbam','Meenam'].map(r => (
+                <SelectItem key={r} value={r}>{r}</SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+        </div>
+
+        <div>
+          <Label>Natchathiram (Star)</Label>
+          <Select value={formData.star} onValueChange={(v) => handleInputChange('star', v)}>
+            <SelectTrigger>
+              <SelectValue placeholder="Select Star" />
+            </SelectTrigger>
+            <SelectContent>
+              {['Ashwini','Bharani','Karthigai','Rohini','Mrigashirsha','Thiruvathirai','Punarpoosam','Poosam','Ayilyam','Magham','Pooram','Uthiram','Hastham','Chithirai','Swathi','Vishakam','Anusham','Kettai','Moolam','Pooradam','Uthiradam','Thiruvonam','Avittam','Sadayam','Poorattadhi','Uthirattadhi','Revathi'].map(s => (
+                <SelectItem key={s} value={s}>{s}</SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+        </div>
+
+        <div>
+          <Label>Place of Birth</Label>
+          <Input
+            value={formData.placeOfBirth}
+            onChange={(e) => handleInputChange('placeOfBirth', e.target.value)}
+            placeholder="e.g., Chennai"
+          />
+        </div>
+
+        <div>
+          <Label>Patham (Padam)</Label>
+          <Select value={formData.padam} onValueChange={(v) => handleInputChange('padam', v)}>
+            <SelectTrigger>
+              <SelectValue placeholder="Select Patham" />
+            </SelectTrigger>
+            <SelectContent>
+              {['1','2','3','4'].map(p => (
+                <SelectItem key={p} value={p}>{p}</SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+        </div>
+      </div>
+
       <div className="flex justify-center">
         <div className="w-full max-w-md">
           <ImageUpload
@@ -1570,6 +2014,26 @@ const RegistrationForm: React.FC = () => {
         <p className="text-sm text-gray-500 mt-2">
           This description will be visible on your profile and help others get to know you better. You can always edit this later.
         </p>
+      </div>
+
+      {/* Aadhar Card Upload */}
+      <div className="mt-6">
+        <Label htmlFor="aadharImage">Aadhar Card Image</Label>
+        <div className="flex justify-center">
+          <div className="w-full max-w-md">
+            <ImageUpload
+              label="Aadhar Card"
+              value={formData.aadharImage || ''}
+              onChange={(base64) => {
+                handleInputChange('aadharImage', base64);
+              }}
+              placeholder="Upload your Aadhar card image"
+              required={false}
+              maxSizeMB={5}
+            />
+          </div>
+        </div>
+        <p className="text-xs text-gray-500 mt-2">We compress the image and store it securely as base64, similar to your profile and Raasi images.</p>
       </div>
       
       {/* Completion Notice */}

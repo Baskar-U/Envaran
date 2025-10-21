@@ -66,6 +66,13 @@ interface RegistrationData {
   motherJob: string;
   motherAlive: string;
   orderOfBirth: string;
+  hasSiblings?: string;
+  numSiblings?: number;
+  siblings?: Array<{
+    relation: 'Sister' | 'Brother';
+    name: string;
+    age: string;
+  }>;
   
   // Physical Attributes
   height: string;
@@ -133,6 +140,7 @@ interface RegistrationData {
   raasiImage?: string; // Base64 encoded Raasi chart image
   profileImage?: string; // Base64 encoded profile image
   profileImageUrl?: string; // Base64 image data for profile photos
+  aadharImage?: string; // Base64 encoded aadhar card image
 }
 
 export default function Profile() {
@@ -148,6 +156,12 @@ export default function Profile() {
   const [selectedImage, setSelectedImage] = useState<File | null>(null);
   const [imagePreview, setImagePreview] = useState<string | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
+
+  // Aadhar image state
+  const [uploadingAadhar, setUploadingAadhar] = useState(false);
+  const [selectedAadhar, setSelectedAadhar] = useState<File | null>(null);
+  const [aadharPreview, setAadharPreview] = useState<string | null>(null);
+  const aadharInputRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
     fetchProfile();
@@ -305,6 +319,24 @@ export default function Profile() {
     }
   };
 
+  const handleAadharSelect = (event: React.ChangeEvent<HTMLInputElement>) => {
+    const file = event.target.files?.[0];
+    if (file) {
+      if (!file.type.startsWith('image/')) {
+        toast({ title: "Invalid file type", description: "Please select an image file", variant: "destructive" });
+        return;
+      }
+      if (file.size > 5 * 1024 * 1024) {
+        toast({ title: "File too large", description: "Please select an image smaller than 5MB", variant: "destructive" });
+        return;
+      }
+      setSelectedAadhar(file);
+      const reader = new FileReader();
+      reader.onload = (e) => setAadharPreview(e.target?.result as string);
+      reader.readAsDataURL(file);
+    }
+  };
+
   // Image compression function
   const compressImage = (file: File, maxWidth: number = 800, maxHeight: number = 800, quality: number = 0.8): Promise<string> => {
     return new Promise((resolve, reject) => {
@@ -443,6 +475,44 @@ export default function Profile() {
     }
   };
 
+  const handleAadharUpload = async () => {
+    if (!selectedAadhar || !firebaseUser || !registration) return;
+    setUploadingAadhar(true);
+    try {
+      toast({ title: "Compressing image...", description: "Optimizing Aadhar image." });
+      const imageBase64 = await compressImage(selectedAadhar);
+      const sizeInBytes = (imageBase64.length * 3) / 4;
+      if (sizeInBytes > 900000) {
+        toast({ title: "Image too large", description: "Please choose a smaller image.", variant: "destructive" });
+        setUploadingAadhar(false);
+        return;
+      }
+      const registrationRef = doc(db, 'registrations', registration.id);
+      await updateDoc(registrationRef, { aadharImage: imageBase64 });
+      setRegistration({ ...registration, aadharImage: imageBase64 } as any);
+      setSelectedAadhar(null);
+      setAadharPreview(null);
+      if (aadharInputRef.current) aadharInputRef.current.value = '';
+      toast({ title: "Aadhar uploaded", description: "Your Aadhar image has been saved." });
+    } catch (e) {
+      toast({ title: "Upload failed", description: "Could not upload Aadhar image.", variant: "destructive" });
+    } finally {
+      setUploadingAadhar(false);
+    }
+  };
+
+  const handleAadharRemove = async () => {
+    if (!firebaseUser || !registration) return;
+    try {
+      const registrationRef = doc(db, 'registrations', registration.id);
+      await updateDoc(registrationRef, { aadharImage: '' });
+      setRegistration({ ...registration, aadharImage: '' } as any);
+      toast({ title: "Aadhar removed", description: "Your Aadhar image has been removed." });
+    } catch (e) {
+      toast({ title: "Error", description: "Failed to remove Aadhar image.", variant: "destructive" });
+    }
+  };
+
   const handleRemovePhoto = async () => {
     if (!firebaseUser) return;
 
@@ -528,6 +598,9 @@ export default function Profile() {
       if (editingRegistration.motherJob) updateData.motherJob = editingRegistration.motherJob;
       if (editingRegistration.motherAlive) updateData.motherAlive = editingRegistration.motherAlive;
       if (editingRegistration.orderOfBirth) updateData.orderOfBirth = editingRegistration.orderOfBirth;
+      if (typeof editingRegistration.hasSiblings !== 'undefined') updateData.hasSiblings = editingRegistration.hasSiblings;
+      if (typeof editingRegistration.numSiblings !== 'undefined') updateData.numSiblings = editingRegistration.numSiblings;
+      if (editingRegistration.siblings) updateData.siblings = editingRegistration.siblings;
       
       // Physical Attributes
       if (editingRegistration.height) updateData.height = editingRegistration.height;
@@ -744,6 +817,53 @@ export default function Profile() {
                     <p className="text-sm text-gray-500 mt-1">
                       This description helps others get to know you better.
                     </p>
+                  </div>
+
+                  {/* Aadhar Image Preview */}
+                  <div className="mb-6">
+                    <Label htmlFor="aadharImage">Aadhar Card</Label>
+                    {registration?.aadharImage ? (
+                      <div className="mt-2">
+                        <div className="border rounded-lg p-2 bg-white">
+                          <img src={aadharPreview || registration.aadharImage} alt="Aadhar" className="w-full h-auto object-contain rounded" />
+                        </div>
+                        <div className="mt-2 flex gap-2">
+                          <input ref={aadharInputRef} type="file" accept="image/*" onChange={handleAadharSelect} className="hidden" />
+                          {!selectedAadhar ? (
+                            <Button variant="outline" size="sm" onClick={() => aadharInputRef.current?.click()} disabled={uploadingAadhar}>Change Aadhar</Button>
+                          ) : (
+                            <>
+                              <Button size="sm" onClick={handleAadharUpload} disabled={uploadingAadhar}>{uploadingAadhar ? 'Saving...' : 'Save'}</Button>
+                              <Button variant="outline" size="sm" onClick={() => { setSelectedAadhar(null); setAadharPreview(null); if (aadharInputRef.current) aadharInputRef.current.value = ''; }} disabled={uploadingAadhar}>Cancel</Button>
+                            </>
+                          )}
+                          <Button variant="outline" size="sm" className="text-red-600" onClick={handleAadharRemove}>Remove</Button>
+                        </div>
+                        <p className="text-xs text-gray-500 mt-1">Only you can see this.</p>
+                      </div>
+                    ) : (
+                      <div className="mt-2">
+                        <div className="border rounded-lg p-4 bg-gray-50 text-center">
+                          {aadharPreview ? (
+                            <img src={aadharPreview} alt="Aadhar preview" className="w-full h-auto object-contain rounded" />
+                          ) : (
+                            <p className="text-gray-500">No Aadhar uploaded yet.</p>
+                          )}
+                        </div>
+                        <div className="mt-2 flex gap-2">
+                          <input ref={aadharInputRef} type="file" accept="image/*" onChange={handleAadharSelect} className="hidden" />
+                          {!selectedAadhar ? (
+                            <Button variant="outline" size="sm" onClick={() => aadharInputRef.current?.click()} disabled={uploadingAadhar}>Upload Aadhar</Button>
+                          ) : (
+                            <>
+                              <Button size="sm" onClick={handleAadharUpload} disabled={uploadingAadhar}>{uploadingAadhar ? 'Saving...' : 'Save'}</Button>
+                              <Button variant="outline" size="sm" onClick={() => { setSelectedAadhar(null); setAadharPreview(null); if (aadharInputRef.current) aadharInputRef.current.value = ''; }} disabled={uploadingAadhar}>Cancel</Button>
+                            </>
+                          )}
+                        </div>
+                        <p className="text-xs text-gray-500 mt-1">We store a compressed image securely for verification.</p>
+                      </div>
+                    )}
                   </div>
                   
                   {/* Complete Registration Notice */}
@@ -1196,6 +1316,113 @@ export default function Profile() {
                         )}
                       </div>
                     </div>
+
+                    {/* Siblings */}
+                    <div className="mt-4 space-y-3">
+                      <div className="grid grid-cols-1 md:grid-cols-3 gap-4 items-end">
+                        <div>
+                          <Label>Do you have sister/brother?</Label>
+                          {isEditing ? (
+                            <Select value={editingRegistration?.hasSiblings || ''} onValueChange={(value) => setEditingRegistration(prev => prev ? { ...prev, hasSiblings: value } : null)}>
+                              <SelectTrigger>
+                                <SelectValue placeholder="Select" />
+                              </SelectTrigger>
+                              <SelectContent>
+                                <SelectItem value="Yes">Yes</SelectItem>
+                                <SelectItem value="No">No</SelectItem>
+                              </SelectContent>
+                            </Select>
+                          ) : (
+                            <p className="text-gray-900 py-2">{registration.hasSiblings || 'Not specified'}</p>
+                          )}
+                        </div>
+                        {((isEditing && editingRegistration?.hasSiblings === 'Yes') || (!isEditing && registration.hasSiblings === 'Yes')) && (
+                          <div>
+                            <Label>How many?</Label>
+                            {isEditing ? (
+                              <Input
+                                type="number"
+                                min={0}
+                                value={(editingRegistration?.numSiblings ?? '') as any}
+                                onChange={(e) => setEditingRegistration(prev => {
+                                  if (!prev) return prev;
+                                  const count = Math.max(0, parseInt(e.target.value || '0'));
+                                  const current = prev.siblings || [];
+                                  const next = [...current];
+                                  if (count > current.length) {
+                                    for (let i = current.length; i < count; i++) {
+                                      next.push({ relation: 'Sister', name: '', age: '' });
+                                    }
+                                  } else if (count < current.length) {
+                                    next.length = count;
+                                  }
+                                  return { ...prev, numSiblings: count, siblings: next };
+                                })}
+                                placeholder="Enter number"
+                              />
+                            ) : (
+                              <p className="text-gray-900 py-2">{registration.numSiblings ?? 0}</p>
+                            )}
+                          </div>
+                        )}
+                      </div>
+
+                      {((isEditing && editingRegistration?.hasSiblings === 'Yes') || (!isEditing && registration.hasSiblings === 'Yes')) && (
+                        <div className="space-y-3">
+                          {(isEditing ? (editingRegistration?.siblings || []) : (registration.siblings || [])).map((s, i) => (
+                            <div key={i} className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                              <div>
+                                <Label>Relation</Label>
+                                {isEditing ? (
+                                  <Select value={s.relation} onValueChange={(value) => setEditingRegistration(prev => {
+                                    if (!prev) return prev;
+                                    const list = [...(prev.siblings || [])];
+                                    list[i] = { ...list[i], relation: value as any };
+                                    return { ...prev, siblings: list };
+                                  })}>
+                                    <SelectTrigger>
+                                      <SelectValue placeholder="Select" />
+                                    </SelectTrigger>
+                                    <SelectContent>
+                                      <SelectItem value="Sister">Sister</SelectItem>
+                                      <SelectItem value="Brother">Brother</SelectItem>
+                                    </SelectContent>
+                                  </Select>
+                                ) : (
+                                  <p className="text-gray-900 py-2">{s.relation}</p>
+                                )}
+                              </div>
+                              <div>
+                                <Label>Name</Label>
+                                {isEditing ? (
+                                  <Input value={s.name} onChange={(e) => setEditingRegistration(prev => {
+                                    if (!prev) return prev;
+                                    const list = [...(prev.siblings || [])];
+                                    list[i] = { ...list[i], name: e.target.value };
+                                    return { ...prev, siblings: list };
+                                  })} />
+                                ) : (
+                                  <p className="text-gray-900 py-2">{s.name}</p>
+                                )}
+                              </div>
+                              <div>
+                                <Label>Age</Label>
+                                {isEditing ? (
+                                  <Input type="number" min={0} value={s.age} onChange={(e) => setEditingRegistration(prev => {
+                                    if (!prev) return prev;
+                                    const list = [...(prev.siblings || [])];
+                                    list[i] = { ...list[i], age: e.target.value };
+                                    return { ...prev, siblings: list };
+                                  })} />
+                                ) : (
+                                  <p className="text-gray-900 py-2">{s.age}</p>
+                                )}
+                              </div>
+                            </div>
+                          ))}
+                        </div>
+                      )}
+                    </div>
                   </div>
                 )}
 
@@ -1216,6 +1443,18 @@ export default function Profile() {
                           <p className="text-gray-900 py-2">{registration.star || 'Not specified'}</p>
                         )}
                       </div>
+                      <div>
+                        <Label>Raasi</Label>
+                        {isEditing ? (
+                          <Input
+                            value={editingRegistration?.raasi || ''}
+                            onChange={(e) => setEditingRegistration(prev => prev ? { ...prev, raasi: e.target.value } : null)}
+                            placeholder="e.g., Mesham"
+                          />
+                        ) : (
+                          <p className="text-gray-900 py-2">{registration.raasi || 'Not specified'}</p>
+                        )}
+                      </div>
                       <div className="md:col-span-2">
                         <Label>Jaadhagam (Raasi) Chart</Label>
                         <div className="mt-2">
@@ -1233,18 +1472,7 @@ export default function Profile() {
                           />
                         </div>
                       </div>
-                      <div>
-                        <Label>Gothram</Label>
-                        {isEditing ? (
-                          <Input
-                            value={editingRegistration?.gothram || ''}
-                            onChange={(e) => setEditingRegistration(prev => prev ? { ...prev, gothram: e.target.value } : null)}
-                            placeholder="e.g., Kashyapa"
-                          />
-                        ) : (
-                          <p className="text-gray-900 py-2">{registration.gothram || 'Not specified'}</p>
-                        )}
-                      </div>
+                      
                       <div>
                         <Label>Place of Birth</Label>
                         {isEditing ? (
@@ -1311,21 +1539,18 @@ export default function Profile() {
                         )}
                       </div>
                       <div>
-                        <Label>Manglik</Label>
+                        <Label>Patham (Padam)</Label>
                         {isEditing ? (
-                          <Select value={editingRegistration?.laknam || ''} onValueChange={(value) => setEditingRegistration(prev => prev ? { ...prev, laknam: value } : null)}>
-                            <SelectTrigger>
-                              <SelectValue placeholder="Select status" />
-                            </SelectTrigger>
-                            <SelectContent>
-                              <SelectItem value="Manglik">Yes</SelectItem>
-                              <SelectItem value="Non-Manglik">No</SelectItem>
-                            </SelectContent>
-                          </Select>
+                          <Input
+                            value={editingRegistration?.padam || ''}
+                            onChange={(e) => setEditingRegistration(prev => prev ? { ...prev, padam: e.target.value } : null)}
+                            placeholder="1 to 4"
+                          />
                         ) : (
-                          <p className="text-gray-900 py-2">{registration.laknam === 'Manglik' ? 'Yes' : 'No'}</p>
+                          <p className="text-gray-900 py-2">{registration.padam || 'Not specified'}</p>
                         )}
                       </div>
+                      
                     </div>
                   </div>
                 )}
@@ -1406,26 +1631,7 @@ export default function Profile() {
                           <p className="text-gray-900 py-2">{registration.partnerExpectations.diet || 'Any'}</p>
                         )}
                       </div>
-                      <div>
-                        <Label>Preferred Marital Status</Label>
-                        {isEditing ? (
-                          <Input
-                            value={editingRegistration?.partnerExpectations?.maritalStatus?.join(', ') || ''}
-                            onChange={(e) => setEditingRegistration(prev => prev ? { 
-                              ...prev, 
-                              partnerExpectations: { 
-                                ...prev.partnerExpectations, 
-                                maritalStatus: e.target.value.split(',').map(s => s.trim()) 
-                              } 
-                            } : null)}
-                            placeholder="e.g., Never Married, Divorced"
-                          />
-                        ) : (
-                          <p className="text-gray-900 py-2">
-                            {registration.partnerExpectations.maritalStatus?.join(', ') || 'Not specified'}
-                          </p>
-                        )}
-                      </div>
+                      
                     </div>
                     <div className="mt-4">
                       <Label>Additional Comments</Label>
@@ -1451,24 +1657,7 @@ export default function Profile() {
                   </div>
                 )}
 
-                {/* Additional Details */}
-                {registration && (
-                  <div className="border-t pt-6">
-                    <h4 className="text-lg font-semibold text-gray-900 mb-4">Additional Information</h4>
-                    {isEditing ? (
-                      <Textarea
-                        value={editingRegistration?.otherDetails || ''}
-                        onChange={(e) => setEditingRegistration(prev => prev ? { ...prev, otherDetails: e.target.value } : null)}
-                        placeholder="Tell us more about yourself..."
-                        rows={4}
-                      />
-                    ) : (
-                      registration.otherDetails && (
-                        <p className="text-gray-900 py-2">{registration.otherDetails}</p>
-                      )
-                    )}
-                  </div>
-                )}
+                
 
                 {/* Save Button */}
                 {isEditing && (

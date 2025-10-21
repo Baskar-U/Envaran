@@ -121,6 +121,14 @@ interface RegistrationData {
   motherJob: string;
   motherAlive: string;
   orderOfBirth: string;
+  hasSiblings?: string;
+  numSiblings?: number;
+  siblings?: Array<{
+    relation: 'Sister' | 'Brother';
+    name: string;
+    age: string;
+    occupation: string;
+  }>;
   
   // Physical Attributes
   height: string;
@@ -492,10 +500,7 @@ export default function ViewProfile() {
                         <label className="text-sm font-semibold text-gray-600">Place of Birth:</label>
                         <p className="text-gray-900">{registration?.placeOfBirth || 'Not specified'}</p>
                       </div>
-                      <div>
-                        <label className="text-sm font-semibold text-gray-600">Manglik:</label>
-                        <p className="text-gray-900">{registration?.laknam === 'Manglik' ? 'Yes' : 'No'}</p>
-                      </div>
+                      
                       <div>
                         <label className="text-sm font-semibold text-gray-600">Religion:</label>
                         <p className="text-gray-900">{registration?.religion || 'Not specified'}</p>
@@ -556,14 +561,23 @@ export default function ViewProfile() {
                           <label className="text-sm font-semibold text-gray-600">Occupation:</label>
                           <p className="text-gray-900">{registration.motherJob || 'Not specified'}</p>
                         </div>
-                        <div>
-                          <label className="text-sm font-semibold text-gray-600">Sister:</label>
-                          <p className="text-gray-900">{registration.orderOfBirth === 'First' ? '1 Unmarried' : 'Not specified'}</p>
-                        </div>
-                        <div>
-                          <label className="text-sm font-semibold text-gray-600">Brother:</label>
-                          <p className="text-gray-900">No</p>
-                        </div>
+                        {registration.siblings && registration.siblings.length > 0 ? (
+                          <div className="md:col-span-2">
+                            <label className="text-sm font-semibold text-gray-600">Siblings:</label>
+                            <div className="mt-1 space-y-1">
+                              {registration.siblings.map((s, idx) => (
+                                <p key={idx} className="text-gray-900">
+                                  {s.relation}: {s.name || 'N/A'}
+                                </p>
+                              ))}
+                            </div>
+                          </div>
+                        ) : (
+                          <div className="md:col-span-2">
+                            <label className="text-sm font-semibold text-gray-600">Siblings:</label>
+                            <p className="text-gray-900">Not specified</p>
+                          </div>
+                        )}
                       </div>
                     </div>
                   )}
@@ -740,10 +754,6 @@ export default function ViewProfile() {
                       </p>
                       
                       <div className="space-y-3 mb-6">
-                        <div className="flex items-center justify-center text-gray-600">
-                          <MapPin className="mr-2 h-4 w-4" />
-                          <span>{profile.location}</span>
-                        </div>
                         <div className="flex items-center justify-center text-gray-600">
                           <Briefcase className="mr-2 h-4 w-4" />
                           <span>{profile.profession}</span>
